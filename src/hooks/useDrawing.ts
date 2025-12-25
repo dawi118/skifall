@@ -11,6 +11,7 @@ interface UseDrawingReturn {
   endDrawing: () => Line | null;
   eraseLine: (point: Point) => string | null;
   getLineAtPoint: (point: Point) => string | null;
+  clearLines: () => void;
 }
 
 export function useDrawing(): UseDrawingReturn {
@@ -66,6 +67,10 @@ export function useDrawing(): UseDrawingReturn {
     [lines]
   );
 
+  const clearLines = useCallback(() => {
+    setLines([]);
+  }, []);
+
   return {
     lines,
     currentStroke,
@@ -75,5 +80,6 @@ export function useDrawing(): UseDrawingReturn {
     endDrawing,
     eraseLine,
     getLineAtPoint,
+    clearLines,
   };
 }

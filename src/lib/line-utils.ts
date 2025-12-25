@@ -104,4 +104,3 @@ export function createLine(points: Point[]): Line {
     points: simplifyLine(points),
   };
 }
-

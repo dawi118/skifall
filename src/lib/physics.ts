@@ -15,10 +15,7 @@ import {
 
 const { World, Vec2, Box, Circle, Edge, RevoluteJoint, WeldJoint } = planck;
 
-// Planck.js uses meters, we use pixels
 const SCALE = 30;
-
-// Collision categories
 const CATEGORY_GROUND = 0x0001;
 const CATEGORY_SKIS = 0x0002;
 const CATEGORY_BODY = 0x0004;
@@ -49,10 +46,8 @@ export interface PhysicsEngine {
 
 export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngine {
   const world = new World({ gravity: Vec2(0, GRAVITY * 10) });
-
   const groundBody = world.createBody({ type: 'static' });
 
-  // Convert to physics units
   const headR = toPhysics(HEAD_RADIUS);
   const upperW = toPhysics(UPPER_BODY_WIDTH);
   const upperH = toPhysics(UPPER_BODY_HEIGHT);
@@ -64,7 +59,6 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
   const pSpawnX = toPhysics(spawnX);
   const pSpawnY = toPhysics(spawnY);
 
-  // Calculate positions from bottom up
   const skiCenterY = pSpawnY;
   const ankleY = skiCenterY - skiH / 2;
   const lowerCenterY = ankleY - lowerH / 2;
@@ -156,7 +150,6 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
 
   const ankleJoint = world.createJoint(new WeldJoint({}, lowerBody, skis, Vec2(pSpawnX, ankleY)));
 
-  // Start inactive
   head.setActive(false);
   upperBody.setActive(false);
   lowerBody.setActive(false);
@@ -310,7 +303,6 @@ export function stepPhysics(engine: PhysicsEngine, deltaMs: number): void {
       engine.ankleJoint = null;
     }
 
-    // Dramatic tumble
     engine.head.setAngularVelocity(engine.head.getAngularVelocity() + (Math.random() - 0.5) * 20);
     engine.upperBody.setAngularVelocity(engine.upperBody.getAngularVelocity() + (Math.random() - 0.5) * 15);
     engine.lowerBody.setAngularVelocity(engine.lowerBody.getAngularVelocity() + (Math.random() - 0.5) * 12);

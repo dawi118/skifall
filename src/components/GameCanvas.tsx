@@ -1,16 +1,22 @@
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import type { Tool, SkierState } from '../types';
 import { usePhysics } from '../hooks/usePhysics';
 import { useCamera } from '../hooks/useCamera';
 import { useDrawing } from '../hooks/useDrawing';
 import { Toolbar } from './Toolbar';
 import { COLORS, PLAYING_ZOOM } from '../lib/constants';
-import { drawGrid, drawMarker, drawLines, drawLine, applyCameraTransform } from '../lib/renderer';
+import { drawGrid, drawMarker, drawLines, drawLine, applyCameraTransform, calculateFitBounds } from '../lib/renderer';
 import { drawSkier, calculateInitialPositions, type SkierRenderState } from '../lib/skier';
+import { generateLevel, type Level } from '../lib/level-generator';
 import './GameCanvas.css';
 
-// Hardcoded for now - will come from level generator in Phase 2
-const SPAWN_POSITION = { x: 200, y: 100 };
+type TransitionPhase = 'idle' | 'skier-out' | 'portals-out' | 'camera-move' | 'portals-in' | 'skier-in' | 'zoom-in';
+
+const ANIM_SPEED = 0.15;
+
+function isAnimationDone(current: number, target: number): boolean {
+  return Math.abs(current - target) < 0.02;
+}
 
 export function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -18,34 +24,42 @@ export function GameCanvas() {
   const animationFrameRef = useRef<number | undefined>(undefined);
   const lastTimeRef = useRef<number>(0);
 
+  const [level, setLevel] = useState<Level>(() => generateLevel());
+  const pendingLevelRef = useRef<Level | null>(null);
+
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [currentTool, setCurrentTool] = useState<Tool>('hand');
   const [skierState, setSkierState] = useState<SkierState>('idle');
   const [isPanning, setIsPanning] = useState(false);
   const [hoveredLineId, setHoveredLineId] = useState<string | null>(null);
+
   const [skierScale, setSkierScale] = useState(1);
   const [skierVisible, setSkierVisible] = useState(true);
+  const [portalScale, setPortalScale] = useState(1);
+  const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>('idle');
+
   const skierScaleTarget = useRef<number | null>(null);
+  const portalScaleTarget = useRef<number | null>(null);
 
   const [skierRenderState, setSkierRenderState] = useState<SkierRenderState>(() =>
-    calculateInitialPositions(SPAWN_POSITION.x, SPAWN_POSITION.y)
+    calculateInitialPositions(level.start.x, level.start.y)
   );
 
   const physics = usePhysics();
-  const camera = useCamera(SPAWN_POSITION);
+  const camera = useCamera(level.start);
   const drawing = useDrawing();
 
-  // Initialize physics
-  useEffect(() => {
-    physics.initPhysics(SPAWN_POSITION.x, SPAWN_POSITION.y);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const levelKey = useMemo(() => `${level.start.x}-${level.start.y}`, [level]);
 
-  // Sync physics lines with drawing lines (handles HMR and state resets)
+  useEffect(() => {
+    physics.initPhysics(level.start.x, level.start.y);
+    setSkierRenderState(calculateInitialPositions(level.start.x, level.start.y));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [levelKey]);
+
   useEffect(() => {
     const physicsLineIds = physics.getLineIds();
     const drawingLineIds = new Set(drawing.lines.map((l) => l.id));
-
     for (const id of physicsLineIds) {
       if (!drawingLineIds.has(id)) {
         physics.removeLine(id);
@@ -53,7 +67,6 @@ export function GameCanvas() {
     }
   }, [drawing.lines, physics]);
 
-  // Handle resize
   useEffect(() => {
     const handleResize = () => {
       if (containerRef.current) {
@@ -66,7 +79,57 @@ export function GameCanvas() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Render
+  useEffect(() => {
+    if (transitionPhase === 'idle') return;
+
+    if (transitionPhase === 'skier-out' && isAnimationDone(skierScale, 0)) {
+      setSkierVisible(false);
+      setTransitionPhase('portals-out');
+      portalScaleTarget.current = 0;
+    } else if (transitionPhase === 'portals-out' && isAnimationDone(portalScale, 0)) {
+      if (pendingLevelRef.current) {
+        setLevel(pendingLevelRef.current);
+        drawing.clearLines();
+
+        const bounds = calculateFitBounds(
+          pendingLevelRef.current.start,
+          pendingLevelRef.current.finish,
+          canvasSize.width,
+          canvasSize.height
+        );
+        camera.setCamera({ x: bounds.centerX, y: bounds.centerY, zoom: bounds.zoom });
+        pendingLevelRef.current = null;
+      }
+      setTransitionPhase('camera-move');
+      setTimeout(() => {
+        setTransitionPhase('portals-in');
+        portalScaleTarget.current = 1;
+      }, 200);
+    } else if (transitionPhase === 'portals-in' && isAnimationDone(portalScale, 1)) {
+      setTransitionPhase('skier-in');
+      setSkierVisible(true);
+      setSkierScale(0);
+      skierScaleTarget.current = 1;
+    } else if (transitionPhase === 'skier-in' && isAnimationDone(skierScale, 1)) {
+      setTransitionPhase('zoom-in');
+      camera.animateToZoom(PLAYING_ZOOM);
+
+      const animateToStart = () => {
+        camera.setCamera(prev => ({
+          ...prev,
+          x: prev.x + (level.start.x - prev.x) * ANIM_SPEED,
+          y: prev.y + (level.start.y - prev.y) * ANIM_SPEED,
+        }));
+      };
+      const interval = setInterval(animateToStart, 16);
+      setTimeout(() => {
+        clearInterval(interval);
+        camera.setCamera(prev => ({ ...prev, x: level.start.x, y: level.start.y }));
+        setTransitionPhase('idle');
+      }, 500);
+    }
+  }, [transitionPhase, skierScale, portalScale, camera, drawing, canvasSize, level.start]);
+
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -82,8 +145,9 @@ export function GameCanvas() {
     applyCameraTransform(ctx, camera.camera, width, height);
 
     drawGrid(ctx, camera.camera, width, height);
-    drawMarker(ctx, SPAWN_POSITION, 'START', COLORS.startZone);
-    drawLines(ctx, drawing.lines, hoveredLineId);
+    drawMarker(ctx, level.start, 'START', COLORS.startZone, portalScale);
+    drawMarker(ctx, level.finish, 'FINISH', COLORS.finishZone, portalScale);
+    drawLines(ctx, drawing.lines, hoveredLineId, portalScale);
 
     if (drawing.currentStroke.length > 0) {
       drawLine(ctx, drawing.currentStroke);
@@ -94,9 +158,8 @@ export function GameCanvas() {
     }
 
     ctx.restore();
-  }, [canvasSize, camera.camera, drawing.lines, drawing.currentStroke, skierRenderState, hoveredLineId, skierScale, skierVisible]);
+  }, [canvasSize, camera.camera, level, drawing.lines, drawing.currentStroke, skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale]);
 
-  // Game loop
   useEffect(() => {
     const loop = (time: number) => {
       const delta = lastTimeRef.current ? time - lastTimeRef.current : 16.67;
@@ -118,9 +181,21 @@ export function GameCanvas() {
       if (skierScaleTarget.current !== null) {
         setSkierScale((prev) => {
           const target = skierScaleTarget.current!;
-          const next = prev + (target - prev) * 0.15;
+          const next = prev + (target - prev) * ANIM_SPEED;
           if (Math.abs(next - target) < 0.01) {
             skierScaleTarget.current = null;
+            return target;
+          }
+          return next;
+        });
+      }
+
+      if (portalScaleTarget.current !== null) {
+        setPortalScale((prev) => {
+          const target = portalScaleTarget.current!;
+          const next = prev + (target - prev) * ANIM_SPEED;
+          if (Math.abs(next - target) < 0.01) {
+            portalScaleTarget.current = null;
             return target;
           }
           return next;
@@ -137,11 +212,9 @@ export function GameCanvas() {
     };
   }, [skierState, physics, camera, render]);
 
-  // --- Input Handlers ---
-
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (skierState === 'moving') return;
+      if (skierState === 'moving' || transitionPhase !== 'idle') return;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
@@ -157,12 +230,12 @@ export function GameCanvas() {
         if (erasedId) physics.removeLine(erasedId);
       }
     },
-    [skierState, currentTool, camera, drawing, physics]
+    [skierState, transitionPhase, currentTool, camera, drawing, physics]
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (skierState === 'moving') return;
+      if (skierState === 'moving' || transitionPhase !== 'idle') return;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
@@ -187,7 +260,7 @@ export function GameCanvas() {
         }
       }
     },
-    [skierState, currentTool, camera, drawing, physics]
+    [skierState, transitionPhase, currentTool, camera, drawing, physics]
   );
 
   const handlePointerUp = useCallback(() => {
@@ -200,7 +273,6 @@ export function GameCanvas() {
     }
   }, [currentTool, camera, drawing, physics]);
 
-  // Wheel zoom (always allowed, even while moving)
   const handleWheelRef = useRef(camera.handleWheel);
   useEffect(() => {
     handleWheelRef.current = camera.handleWheel;
@@ -214,54 +286,64 @@ export function GameCanvas() {
     return () => canvas.removeEventListener('wheel', onWheel);
   }, []);
 
-  // Middle-mouse pan
   const handleMiddleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (e.button === 1 && skierState !== 'moving') {
+      if (e.button === 1 && skierState !== 'moving' && transitionPhase === 'idle') {
         e.preventDefault();
         camera.handlePanStart(e.clientX, e.clientY);
       }
     },
-    [camera, skierState]
+    [camera, skierState, transitionPhase]
   );
 
   const handleMiddleMouseMove = useCallback(
     (e: React.MouseEvent) => {
-      if (skierState !== 'moving') camera.handlePanMove(e.clientX, e.clientY);
+      if (skierState !== 'moving' && transitionPhase === 'idle') {
+        camera.handlePanMove(e.clientX, e.clientY);
+      }
     },
-    [camera, skierState]
+    [camera, skierState, transitionPhase]
   );
 
   const handleMiddleMouseUp = useCallback(() => camera.handlePanEnd(), [camera]);
 
-  // --- Actions ---
-
   const handlePlay = useCallback(() => {
-    if (skierState === 'idle') {
+    if (skierState === 'idle' && transitionPhase === 'idle') {
       setSkierState('moving');
       physics.play();
       camera.animateToZoom(PLAYING_ZOOM);
     }
-  }, [skierState, physics, camera]);
+  }, [skierState, transitionPhase, physics, camera]);
 
   const handleReset = useCallback(() => {
+    if (transitionPhase !== 'idle') return;
+
     setSkierState('idle');
     physics.reset();
 
     setSkierVisible(false);
     camera.animateToZoom(1);
-    camera.setCamera((prev) => ({ ...prev, x: SPAWN_POSITION.x, y: SPAWN_POSITION.y }));
-    setSkierRenderState(calculateInitialPositions(SPAWN_POSITION.x, SPAWN_POSITION.y));
+    camera.setCamera((prev) => ({ ...prev, x: level.start.x, y: level.start.y }));
+    setSkierRenderState(calculateInitialPositions(level.start.x, level.start.y));
 
     setTimeout(() => {
       setSkierScale(0);
       setSkierVisible(true);
       skierScaleTarget.current = 1;
     }, 300);
-  }, [physics, camera]);
+  }, [physics, camera, level.start, transitionPhase]);
 
-  // --- Render ---
+  const handleNewLevel = useCallback(() => {
+    if (transitionPhase !== 'idle') return;
 
+    pendingLevelRef.current = generateLevel();
+    setSkierState('idle');
+    physics.reset();
+    setTransitionPhase('skier-out');
+    skierScaleTarget.current = 0;
+  }, [physics, transitionPhase]);
+
+  const isTransitioning = transitionPhase !== 'idle';
   const canvasClass = `game-canvas tool-${currentTool}${isPanning ? ' panning' : ''}${hoveredLineId ? ' eraser-hover' : ''}`;
 
   return (
@@ -285,14 +367,23 @@ export function GameCanvas() {
         <button
           className={`start-btn ${skierState !== 'idle' ? 'reset' : ''}`}
           onClick={skierState !== 'idle' ? handleReset : handlePlay}
+          disabled={isTransitioning}
         >
           {skierState !== 'idle' ? '↺ Reset' : 'Start'}
+        </button>
+        <button
+          className="new-level-btn"
+          onClick={handleNewLevel}
+          disabled={isTransitioning}
+        >
+          New Level
         </button>
       </div>
 
       <Toolbar
         currentTool={currentTool}
         skierState={skierState}
+        disabled={isTransitioning}
         onToolChange={(tool) => {
           setCurrentTool(tool);
           setHoveredLineId(null);

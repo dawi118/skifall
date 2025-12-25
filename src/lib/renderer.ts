@@ -45,24 +45,40 @@ export function drawMarker(
   ctx: CanvasRenderingContext2D,
   position: Point,
   label: string,
-  color: string
+  color: string,
+  scale = 1
 ) {
+  if (scale <= 0) return;
+
+  ctx.save();
+  ctx.translate(position.x, position.y - 20);
+  ctx.scale(scale, scale);
+
   ctx.fillStyle = color;
-  ctx.globalAlpha = 0.3;
+  ctx.globalAlpha = 0.3 * scale;
   ctx.beginPath();
-  ctx.arc(position.x, position.y - 20, 30, 0, Math.PI * 2);
+  ctx.arc(0, 0, 30, 0, Math.PI * 2);
   ctx.fill();
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = scale;
 
   ctx.fillStyle = color;
   ctx.font = 'bold 12px system-ui';
   ctx.textAlign = 'center';
-  ctx.fillText(label, position.x, position.y - 60);
+  ctx.fillText(label, 0, -40);
+
+  ctx.restore();
 }
 
-export function drawLine(ctx: CanvasRenderingContext2D, points: Point[], highlight = false) {
-  if (points.length < 2) return;
+export function drawLine(
+  ctx: CanvasRenderingContext2D,
+  points: Point[],
+  highlight = false,
+  opacity = 1
+) {
+  if (points.length < 2 || opacity <= 0) return;
 
+  ctx.save();
+  ctx.globalAlpha = opacity;
   ctx.strokeStyle = highlight ? COLORS.lineHighlight : COLORS.line;
   ctx.lineWidth = highlight ? LINE_WIDTH + 2 : LINE_WIDTH;
   ctx.lineCap = 'round';
@@ -74,11 +90,17 @@ export function drawLine(ctx: CanvasRenderingContext2D, points: Point[], highlig
     ctx.lineTo(points[i].x, points[i].y);
   }
   ctx.stroke();
+  ctx.restore();
 }
 
-export function drawLines(ctx: CanvasRenderingContext2D, lines: Line[], hoveredLineId: string | null) {
+export function drawLines(
+  ctx: CanvasRenderingContext2D,
+  lines: Line[],
+  hoveredLineId: string | null,
+  opacity = 1
+) {
   for (const line of lines) {
-    drawLine(ctx, line.points, line.id === hoveredLineId);
+    drawLine(ctx, line.points, line.id === hoveredLineId, opacity);
   }
 }
 
@@ -93,3 +115,28 @@ export function applyCameraTransform(
   ctx.translate(-camera.x, -camera.y);
 }
 
+export function calculateFitBounds(
+  start: Point,
+  finish: Point,
+  viewportWidth: number,
+  viewportHeight: number,
+  padding = 150
+): { centerX: number; centerY: number; zoom: number } {
+  const minX = Math.min(start.x, finish.x) - padding;
+  const maxX = Math.max(start.x, finish.x) + padding;
+  const minY = Math.min(start.y, finish.y) - padding;
+  const maxY = Math.max(start.y, finish.y) + padding;
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+
+  const zoomX = viewportWidth / width;
+  const zoomY = viewportHeight / height;
+  const zoom = Math.min(zoomX, zoomY, 1); // Cap at 1x
+
+  return {
+    centerX: (minX + maxX) / 2,
+    centerY: (minY + maxY) / 2,
+    zoom,
+  };
+}

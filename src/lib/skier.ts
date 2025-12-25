@@ -1,6 +1,5 @@
 import { SKIER_WIDTH, SKIER_HEIGHT, COLORS } from './constants';
 
-// Derived dimensions
 export const HEAD_RADIUS = 7;
 export const UPPER_BODY_WIDTH = SKIER_WIDTH;
 export const UPPER_BODY_HEIGHT = SKIER_HEIGHT * 0.45;
@@ -41,8 +40,6 @@ export function calculateInitialPositions(spawnX: number, spawnY: number): Skier
   };
 }
 
-// --- Rendering ---
-
 function drawPart(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -67,7 +64,6 @@ export function drawSkier(ctx: CanvasRenderingContext2D, state: SkierRenderState
     ctx.translate(-upper.x, -upper.y);
   }
 
-  // Draw back to front: skis, lower, upper, head
   drawPart(ctx, skis.x, skis.y, skis.angle, () => {
     ctx.fillStyle = COLORS.skis;
     ctx.fillRect(-SKI_WIDTH / 2, -SKI_HEIGHT / 2, SKI_WIDTH, SKI_HEIGHT);
@@ -94,4 +90,3 @@ export function drawSkier(ctx: CanvasRenderingContext2D, state: SkierRenderState
     ctx.restore();
   }
 }
-

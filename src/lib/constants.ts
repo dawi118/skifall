@@ -1,33 +1,24 @@
-// Physics
 export const GRAVITY = 1;
 
-// Skier dimensions (base values - see lib/skier.ts for derived dimensions)
 export const SKIER_WIDTH = 20;
 export const SKIER_HEIGHT = 30;
 
-// Line drawing
 export const LINE_WIDTH = 4;
 
-// Camera
 export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 2;
 export const ZOOM_SPEED = 0.001;
 export const PLAYING_ZOOM = 1.5;
 
-// Level bounds
 export const LEVEL_BOUNDS = {
   maxWidth: 1920,
   maxHeight: 1080,
   minSeparation: 1 / 3,
 } as const;
 
-// Timer
 export const ROUND_DURATION_SECONDS = 60;
-
-// Scoring
 export const BASE_POINTS = 100;
 
-// Colors
 export const COLORS = {
   background: '#FAFAFA',
   grid: '#E5E7EB',
