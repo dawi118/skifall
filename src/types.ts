@@ -1,0 +1,28 @@
+// Core types for SKI FALL
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface Line {
+  id: string;
+  points: Point[];
+}
+
+export type Tool = 'pencil' | 'eraser';
+
+export type SkierState = 'idle' | 'moving' | 'fallen' | 'finished';
+
+export interface Camera {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+export interface GameState {
+  skierState: SkierState;
+  lines: Line[];
+  currentTool: Tool;
+}
+
