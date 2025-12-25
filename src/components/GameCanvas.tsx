@@ -3,8 +3,10 @@ import type { Tool, SkierState } from '../types';
 import { usePhysics } from '../hooks/usePhysics';
 import { useCamera } from '../hooks/useCamera';
 import { useDrawing } from '../hooks/useDrawing';
+import { useTimer } from '../hooks/useTimer';
 import { Toolbar } from './Toolbar';
-import { COLORS, PLAYING_ZOOM } from '../lib/constants';
+import { Timer } from './Timer';
+import { COLORS, PLAYING_ZOOM, FINISH_ZONE_RADIUS } from '../lib/constants';
 import { drawGrid, drawMarker, drawLines, drawLine, applyCameraTransform, calculateFitBounds } from '../lib/renderer';
 import { drawSkier, calculateInitialPositions, type SkierRenderState } from '../lib/skier';
 import { generateLevel, type Level } from '../lib/level-generator';
@@ -48,12 +50,15 @@ export function GameCanvas() {
   const physics = usePhysics();
   const camera = useCamera(level.start);
   const drawing = useDrawing();
+  const timer = useTimer();
 
   const levelKey = useMemo(() => `${level.start.x}-${level.start.y}`, [level]);
 
   useEffect(() => {
     physics.initPhysics(level.start.x, level.start.y);
     setSkierRenderState(calculateInitialPositions(level.start.x, level.start.y));
+    timer.reset();
+    timer.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [levelKey]);
 
@@ -165,12 +170,20 @@ export function GameCanvas() {
       const delta = lastTimeRef.current ? time - lastTimeRef.current : 16.67;
       lastTimeRef.current = time;
 
-      if (skierState === 'moving' || skierState === 'fallen') {
+      if (skierState === 'moving' || skierState === 'fallen' || skierState === 'finished') {
         const result = physics.update(delta);
         setSkierRenderState(result);
 
         if (result.crashed && skierState === 'moving') {
           setSkierState('fallen');
+        }
+
+        if (skierState === 'moving' && !result.crashed) {
+          const dx = result.skis.x - level.finish.x;
+          const dy = result.skis.y - (level.finish.y - 20);
+          if (dx * dx + dy * dy < FINISH_ZONE_RADIUS * FINISH_ZONE_RADIUS) {
+            setSkierState('finished');
+          }
         }
 
         camera.followTarget({ x: result.upper.x, y: result.upper.y });
@@ -210,7 +223,7 @@ export function GameCanvas() {
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [skierState, physics, camera, render]);
+  }, [skierState, physics, camera, render, level.finish]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -339,11 +352,25 @@ export function GameCanvas() {
     pendingLevelRef.current = generateLevel();
     setSkierState('idle');
     physics.reset();
+    timer.stop();
     setTransitionPhase('skier-out');
     skierScaleTarget.current = 0;
-  }, [physics, transitionPhase]);
+  }, [physics, transitionPhase, timer]);
+
+  useEffect(() => {
+    if (skierState === 'finished' || skierState === 'fallen') {
+      timer.stop();
+    }
+  }, [skierState, timer]);
+
+  useEffect(() => {
+    if (timer.isExpired && skierState === 'moving') {
+      setSkierState('fallen');
+    }
+  }, [timer.isExpired, skierState]);
 
   const isTransitioning = transitionPhase !== 'idle';
+  const showTimer = timer.isRunning || timer.isExpired || skierState === 'finished';
   const canvasClass = `game-canvas tool-${currentTool}${isPanning ? ' panning' : ''}${hoveredLineId ? ' eraser-hover' : ''}`;
 
   return (
@@ -362,6 +389,13 @@ export function GameCanvas() {
         onMouseUp={handleMiddleMouseUp}
         onMouseLeave={handleMiddleMouseUp}
       />
+
+      {showTimer && (
+        <Timer
+          timeRemaining={timer.timeRemaining}
+          isFinished={skierState === 'finished'}
+        />
+      )}
 
       <div className="top-controls">
         <button

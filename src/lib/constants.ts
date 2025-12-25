@@ -18,6 +18,7 @@ export const LEVEL_BOUNDS = {
 
 export const ROUND_DURATION_SECONDS = 60;
 export const BASE_POINTS = 100;
+export const FINISH_ZONE_RADIUS = 50;
 
 export const COLORS = {
   background: '#FAFAFA',

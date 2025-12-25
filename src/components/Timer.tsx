@@ -1,20 +1,23 @@
-import { formatCountdown } from '../lib/scoring';
 import './Timer.css';
 
 interface TimerProps {
   timeRemaining: number;
-  isRunning: boolean;
-  isExpired: boolean;
+  isFinished: boolean;
 }
 
-export function Timer({ timeRemaining, isRunning, isExpired }: TimerProps) {
-  const displayTime = formatCountdown(timeRemaining);
-  
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 10);
+  return `${mins}:${secs.toString().padStart(2, '0')}.${ms}`;
+}
+
+export function Timer({ timeRemaining, isFinished }: TimerProps) {
+  const isLow = timeRemaining <= 10 && timeRemaining > 0;
+
   return (
-    <div className={`timer ${isRunning ? 'running' : ''} ${isExpired ? 'expired' : ''}`}>
-      <span className="timer-icon">⏱️</span>
-      <span className="timer-value">{displayTime}</span>
+    <div className={`timer ${isLow ? 'low' : ''} ${isFinished ? 'finished' : ''}`}>
+      {isFinished ? '🏁 FINISH!' : formatTime(timeRemaining)}
     </div>
   );
 }
-
