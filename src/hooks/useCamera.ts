@@ -11,8 +11,17 @@ interface UseCameraReturn {
   handlePanEnd: () => void;
   followTarget: (target: Point) => void;
   resetCamera: () => void;
+  animateToZoom: (targetZoom: number) => void;
+  updateAnimation: () => void;
   screenToWorld: (screenX: number, screenY: number, canvasRect: DOMRect) => Point;
   worldToScreen: (worldX: number, worldY: number, canvasRect: DOMRect) => Point;
+}
+
+// Smooth interpolation factor (0-1, higher = faster)
+const CAMERA_LERP_SPEED = 0.08;
+
+function lerp(current: number, target: number, factor: number): number {
+  return current + (target - current) * factor;
 }
 
 export function useCamera(): UseCameraReturn {
@@ -25,6 +34,7 @@ export function useCamera(): UseCameraReturn {
 
   const isPanning = useRef(false);
   const lastPanPosition = useRef({ x: 0, y: 0 });
+  const targetZoom = useRef<number | null>(null);
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
@@ -70,11 +80,30 @@ export function useCamera(): UseCameraReturn {
   }, []);
 
   const resetCamera = useCallback(() => {
+    targetZoom.current = null;
     setCamera({
       x: SPAWN_POSITION.x,
       y: SPAWN_POSITION.y,
       zoom: 1,
     });
+  }, []);
+
+  const animateToZoom = useCallback((zoom: number) => {
+    targetZoom.current = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+  }, []);
+
+  const updateAnimation = useCallback(() => {
+    if (targetZoom.current !== null) {
+      setCamera((prev) => {
+        const newZoom = lerp(prev.zoom, targetZoom.current!, CAMERA_LERP_SPEED);
+        // Stop animating when close enough
+        if (Math.abs(newZoom - targetZoom.current!) < 0.001) {
+          targetZoom.current = null;
+          return { ...prev, zoom: targetZoom.current! };
+        }
+        return { ...prev, zoom: newZoom };
+      });
+    }
   }, []);
 
   // Convert screen coordinates to world coordinates
@@ -119,6 +148,8 @@ export function useCamera(): UseCameraReturn {
     handlePanEnd,
     followTarget,
     resetCamera,
+    animateToZoom,
+    updateAnimation,
     screenToWorld,
     worldToScreen,
   };

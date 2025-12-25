@@ -9,6 +9,7 @@ import {
   LINE_WIDTH,
   SKIER_WIDTH,
   SPAWN_POSITION,
+  PLAYING_ZOOM,
 } from '../lib/constants';
 import {
   HEAD_RADIUS,
@@ -165,14 +166,26 @@ function drawSkis(ctx: CanvasRenderingContext2D, x: number, y: number, angle: nu
   ctx.restore();
 }
 
-function drawSkier(ctx: CanvasRenderingContext2D, state: SkierRenderState) {
+function drawSkier(ctx: CanvasRenderingContext2D, state: SkierRenderState, scale: number = 1) {
   const { head, upper, lower, skis } = state.parts;
+  
+  // Apply scale around the skier's center (upper body position)
+  if (scale !== 1) {
+    ctx.save();
+    ctx.translate(upper.x, upper.y);
+    ctx.scale(scale, scale);
+    ctx.translate(-upper.x, -upper.y);
+  }
   
   // Draw from back to front: skis, lower body, upper body, head
   drawSkis(ctx, skis.x, skis.y, skis.angle);
   drawLowerBody(ctx, lower.x, lower.y, lower.angle);
   drawUpperBody(ctx, upper.x, upper.y, upper.angle);
   drawHead(ctx, head.x, head.y, head.angle);
+  
+  if (scale !== 1) {
+    ctx.restore();
+  }
 }
 
 export function GameCanvas() {
@@ -184,6 +197,11 @@ export function GameCanvas() {
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [currentTool, setCurrentTool] = useState<Tool>('hand');
   const [skierState, setSkierState] = useState<SkierState>('idle');
+  const [isPanning, setIsPanning] = useState(false);
+  const [hoveredLineId, setHoveredLineId] = useState<string | null>(null);
+  const [skierScale, setSkierScale] = useState(1);
+  const [skierVisible, setSkierVisible] = useState(true);
+  const skierScaleTarget = useRef<number | null>(null);
   
   // Calculate initial positions (from bottom up)
   const skiCenterY = SPAWN_POSITION.y;
@@ -258,9 +276,13 @@ export function GameCanvas() {
     // Draw spawn point marker
     drawSpawnMarker(ctx);
 
-    // Draw all completed lines
+    // Draw all completed lines (highlight hovered line for eraser)
+    const HIGHLIGHT_COLOR = '#6366F1'; // Same purple as tool selection
     drawing.lines.forEach((line) => {
-      drawLine(ctx, line.points, COLORS.line, LINE_WIDTH);
+      const isHovered = line.id === hoveredLineId;
+      const color = isHovered ? HIGHLIGHT_COLOR : COLORS.line;
+      const width = isHovered ? LINE_WIDTH + 2 : LINE_WIDTH;
+      drawLine(ctx, line.points, color, width);
     });
 
     // Draw current stroke (while drawing)
@@ -268,12 +290,14 @@ export function GameCanvas() {
       drawLine(ctx, drawing.currentStroke, COLORS.line, LINE_WIDTH);
     }
 
-    // Draw skier
-    drawSkier(ctx, skierRenderState);
+    // Draw skier (with scale animation and visibility)
+    if (skierVisible) {
+      drawSkier(ctx, skierRenderState, skierScale);
+    }
 
     // Restore context
     ctx.restore();
-  }, [canvasSize, camera.camera, drawing.lines, drawing.currentStroke, skierRenderState]);
+  }, [canvasSize, camera.camera, drawing.lines, drawing.currentStroke, skierRenderState, hoveredLineId, skierScale, skierVisible]);
 
   // Game loop
   useEffect(() => {
@@ -293,6 +317,22 @@ export function GameCanvas() {
 
         // Follow skier upper body with camera
         camera.followTarget({ x: result.parts.upper.x, y: result.parts.upper.y });
+      }
+
+      // Update camera animation (smooth zoom transitions)
+      camera.updateAnimation();
+
+      // Update skier scale animation (pop-in effect)
+      if (skierScaleTarget.current !== null) {
+        setSkierScale((prev) => {
+          const target = skierScaleTarget.current!;
+          const newScale = prev + (target - prev) * 0.15; // Faster lerp for snappy pop
+          if (Math.abs(newScale - target) < 0.01) {
+            skierScaleTarget.current = null;
+            return target;
+          }
+          return newScale;
+        });
       }
 
       // Render
@@ -322,6 +362,7 @@ export function GameCanvas() {
 
       if (currentTool === 'hand') {
         camera.handlePanStart(e.clientX, e.clientY);
+        setIsPanning(true);
       } else if (currentTool === 'pencil') {
         const worldPoint = camera.screenToWorld(e.clientX, e.clientY, rect);
         drawing.startDrawing(worldPoint);
@@ -347,14 +388,27 @@ export function GameCanvas() {
 
       if (currentTool === 'hand') {
         camera.handlePanMove(e.clientX, e.clientY);
-      } else if (currentTool === 'pencil' && drawing.isDrawing) {
+        setHoveredLineId(null);
+      } else if (currentTool === 'pencil') {
+        if (drawing.isDrawing) {
+          const worldPoint = camera.screenToWorld(e.clientX, e.clientY, rect);
+          drawing.continueDrawing(worldPoint);
+        }
+        setHoveredLineId(null);
+      } else if (currentTool === 'eraser') {
         const worldPoint = camera.screenToWorld(e.clientX, e.clientY, rect);
-        drawing.continueDrawing(worldPoint);
-      } else if (currentTool === 'eraser' && e.buttons > 0) {
-        const worldPoint = camera.screenToWorld(e.clientX, e.clientY, rect);
-        const erasedId = drawing.eraseLine(worldPoint);
-        if (erasedId) {
-          physics.removeLine(erasedId);
+        
+        // Check for hover
+        const lineAtPoint = drawing.getLineAtPoint(worldPoint);
+        setHoveredLineId(lineAtPoint);
+        
+        // Erase if clicking/dragging
+        if (e.buttons > 0 && lineAtPoint) {
+          const erasedId = drawing.eraseLine(worldPoint);
+          if (erasedId) {
+            physics.removeLine(erasedId);
+            setHoveredLineId(null);
+          }
         }
       }
     },
@@ -364,6 +418,7 @@ export function GameCanvas() {
   const handlePointerUp = useCallback(() => {
     if (currentTool === 'hand') {
       camera.handlePanEnd();
+      setIsPanning(false);
     } else if (currentTool === 'pencil') {
       const newLine = drawing.endDrawing();
       if (newLine) {
@@ -372,20 +427,18 @@ export function GameCanvas() {
     }
   }, [currentTool, camera, drawing, physics]);
 
-  // Handle wheel for zoom
+  // Handle wheel for zoom (always allowed, even when moving)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const handleWheel = (e: WheelEvent) => {
-      if (skierState !== 'moving') {
-        camera.handleWheel(e);
-      }
+      camera.handleWheel(e);
     };
 
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
-  }, [camera, skierState]);
+  }, [camera]);
 
   // Handle middle-mouse pan
   const handleMiddleMouseDown = useCallback(
@@ -416,12 +469,27 @@ export function GameCanvas() {
     if (skierState === 'idle') {
       setSkierState('moving');
       physics.play();
+      // Smoothly animate camera to playing zoom level
+      camera.animateToZoom(PLAYING_ZOOM);
     }
-  }, [skierState, physics]);
+  }, [skierState, physics, camera]);
 
   const handleReset = useCallback(() => {
     setSkierState('idle');
     physics.reset();
+    
+    // Hide skier and animate camera zoom out
+    setSkierVisible(false);
+    camera.animateToZoom(1);
+    
+    // Move camera back to spawn
+    camera.setCamera((prev) => ({
+      ...prev,
+      x: SPAWN_POSITION.x,
+      y: SPAWN_POSITION.y,
+    }));
+    
+    // Reset skier position
     setSkierRenderState({
       parts: {
         head: { x: SPAWN_POSITION.x, y: headCenterY, angle: 0 },
@@ -431,7 +499,14 @@ export function GameCanvas() {
       },
       crashed: false,
     });
-    camera.resetCamera();
+    
+    // After a moment, pop the skier back in with scale animation
+    setTimeout(() => {
+      setSkierScale(0);
+      setSkierVisible(true);
+      // Start the scale-up animation
+      skierScaleTarget.current = 1;
+    }, 300);
   }, [physics, camera, headCenterY, upperCenterY, lowerCenterY, skiCenterY]);
 
   return (
@@ -440,7 +515,7 @@ export function GameCanvas() {
         ref={canvasRef}
         width={canvasSize.width}
         height={canvasSize.height}
-        className="game-canvas"
+        className={`game-canvas tool-${currentTool}${isPanning ? ' panning' : ''}${hoveredLineId ? ' eraser-hover' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -464,7 +539,10 @@ export function GameCanvas() {
       <Toolbar
         currentTool={currentTool}
         skierState={skierState}
-        onToolChange={setCurrentTool}
+        onToolChange={(tool) => {
+          setCurrentTool(tool);
+          setHoveredLineId(null);
+        }}
       />
     </div>
   );

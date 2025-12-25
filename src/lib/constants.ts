@@ -16,6 +16,7 @@ export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 2;
 export const ZOOM_SPEED = 0.001;
 export const PAN_SPEED = 1;
+export const PLAYING_ZOOM = 1.5; // Zoom level when skier is moving
 
 // Spawn position (will be replaced by level generator in Phase 2)
 export const SPAWN_POSITION = { x: 200, y: 100 };

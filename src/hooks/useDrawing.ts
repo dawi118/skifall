@@ -10,6 +10,7 @@ interface UseDrawingReturn {
   continueDrawing: (point: Point) => void;
   endDrawing: () => Line | null;
   eraseLine: (point: Point) => string | null;
+  getLineAtPoint: (point: Point) => string | null;
   addLine: (line: Line) => void;
   removeLine: (lineId: string) => void;
   clearLines: () => void;
@@ -59,6 +60,11 @@ export function useDrawing(): UseDrawingReturn {
     return erasedLineId;
   }, []);
 
+  const getLineAtPoint = useCallback((point: Point): string | null => {
+    const hoveredLine = lines.find((line) => isPointNearLine(point, line));
+    return hoveredLine ? hoveredLine.id : null;
+  }, [lines]);
+
   const addLine = useCallback((line: Line) => {
     setLines((prev) => [...prev, line]);
   }, []);
@@ -79,6 +85,7 @@ export function useDrawing(): UseDrawingReturn {
     continueDrawing,
     endDrawing,
     eraseLine,
+    getLineAtPoint,
     addLine,
     removeLine,
     clearLines,
