@@ -6,122 +6,87 @@ import {
   resetSkier,
   startSkier,
   stepPhysics,
-  getSkierPosition,
-  getSkierParts,
-  hasCrashed,
+  getSkierState,
   type PhysicsEngine,
-  type SkierParts,
 } from '../lib/physics';
-import type { Line, Point } from '../types';
-
-interface SkierState {
-  parts: SkierParts;
-  crashed: boolean;
-}
+import type { Line } from '../types';
+import type { SkierRenderState } from '../lib/skier';
 
 interface UsePhysicsReturn {
-  physicsRef: React.MutableRefObject<PhysicsEngine | null>;
-  initPhysics: () => void;
+  initPhysics: (spawnX: number, spawnY: number) => void;
   addLine: (line: Line) => void;
   removeLine: (lineId: string) => void;
-  clearAllLines: () => void;
   getLineIds: () => string[];
   reset: () => void;
   play: () => void;
-  update: (delta: number) => SkierState;
-  getPosition: () => Point;
+  update: (delta: number) => SkierRenderState;
 }
 
 export function usePhysics(): UsePhysicsReturn {
-  const physicsRef = useRef<PhysicsEngine | null>(null);
+  const engineRef = useRef<PhysicsEngine | null>(null);
 
-  const initPhysics = useCallback(() => {
-    physicsRef.current = createPhysicsEngine();
+  const initPhysics = useCallback((spawnX: number, spawnY: number) => {
+    engineRef.current = createPhysicsEngine(spawnX, spawnY);
   }, []);
 
   const addLine = useCallback((line: Line) => {
-    if (physicsRef.current) {
-      addLineToWorld(physicsRef.current, line);
+    if (engineRef.current) {
+      addLineToWorld(engineRef.current, line);
     }
   }, []);
 
   const removeLine = useCallback((lineId: string) => {
-    if (physicsRef.current) {
-      removeLineFromWorld(physicsRef.current, lineId);
-    }
-  }, []);
-
-  const clearAllLines = useCallback(() => {
-    if (physicsRef.current) {
-      // Get all line IDs and remove them
-      const lineIds = Array.from(physicsRef.current.lineFixtures.keys());
-      for (const lineId of lineIds) {
-        removeLineFromWorld(physicsRef.current, lineId);
-      }
+    if (engineRef.current) {
+      removeLineFromWorld(engineRef.current, lineId);
     }
   }, []);
 
   const getLineIds = useCallback((): string[] => {
-    if (physicsRef.current) {
-      return Array.from(physicsRef.current.lineFixtures.keys());
+    if (engineRef.current) {
+      return Array.from(engineRef.current.lineFixtures.keys());
     }
     return [];
   }, []);
 
   const reset = useCallback(() => {
-    if (physicsRef.current) {
-      resetSkier(physicsRef.current);
+    if (engineRef.current) {
+      resetSkier(engineRef.current);
     }
   }, []);
 
   const play = useCallback(() => {
-    if (physicsRef.current) {
-      startSkier(physicsRef.current);
+    if (engineRef.current) {
+      startSkier(engineRef.current);
     }
   }, []);
 
-  const update = useCallback((delta: number): SkierState => {
-    if (physicsRef.current) {
-      stepPhysics(physicsRef.current, delta);
-      return {
-        parts: getSkierParts(physicsRef.current),
-        crashed: hasCrashed(physicsRef.current),
-      };
+  const update = useCallback((delta: number): SkierRenderState => {
+    if (engineRef.current) {
+      stepPhysics(engineRef.current, delta);
+      return getSkierState(engineRef.current);
     }
     return {
-      parts: {
-        head: { x: 0, y: 0, angle: 0 },
-        upper: { x: 0, y: 0, angle: 0 },
-        lower: { x: 0, y: 0, angle: 0 },
-        skis: { x: 0, y: 0, angle: 0 },
-      },
+      head: { x: 0, y: 0, angle: 0 },
+      upper: { x: 0, y: 0, angle: 0 },
+      lower: { x: 0, y: 0, angle: 0 },
+      skis: { x: 0, y: 0, angle: 0 },
       crashed: false,
     };
   }, []);
 
-  const getPosition = useCallback(() => {
-    if (physicsRef.current) {
-      return getSkierPosition(physicsRef.current);
-    }
-    return { x: 0, y: 0 };
-  }, []);
-
   useEffect(() => {
     return () => {
-      physicsRef.current = null;
+      engineRef.current = null;
     };
   }, []);
 
   return {
-    physicsRef,
     initPhysics,
     addLine,
     removeLine,
-    clearAllLines,
     getLineIds,
     reset,
     play,
     update,
-    getPosition,
   };
 }

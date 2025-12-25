@@ -1,5 +1,3 @@
-// Core types for SKI FALL
-
 export interface Point {
   x: number;
   y: number;
@@ -19,10 +17,3 @@ export interface Camera {
   y: number;
   zoom: number;
 }
-
-export interface GameState {
-  skierState: SkierState;
-  lines: Line[];
-  currentTool: Tool;
-}
-

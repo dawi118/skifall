@@ -11,9 +11,6 @@ interface UseDrawingReturn {
   endDrawing: () => Line | null;
   eraseLine: (point: Point) => string | null;
   getLineAtPoint: (point: Point) => string | null;
-  addLine: (line: Line) => void;
-  removeLine: (lineId: string) => void;
-  clearLines: () => void;
 }
 
 export function useDrawing(): UseDrawingReturn {
@@ -26,10 +23,13 @@ export function useDrawing(): UseDrawingReturn {
     setCurrentStroke([point]);
   }, []);
 
-  const continueDrawing = useCallback((point: Point) => {
-    if (!isDrawing) return;
-    setCurrentStroke((prev) => [...prev, point]);
-  }, [isDrawing]);
+  const continueDrawing = useCallback(
+    (point: Point) => {
+      if (!isDrawing) return;
+      setCurrentStroke((prev) => [...prev, point]);
+    },
+    [isDrawing]
+  );
 
   const endDrawing = useCallback((): Line | null => {
     if (!isDrawing || currentStroke.length < 2) {
@@ -46,36 +46,25 @@ export function useDrawing(): UseDrawingReturn {
   }, [isDrawing, currentStroke]);
 
   const eraseLine = useCallback((point: Point): string | null => {
-    let erasedLineId: string | null = null;
-
+    let erasedId: string | null = null;
     setLines((prev) => {
-      const lineToErase = prev.find((line) => isPointNearLine(point, line));
-      if (lineToErase) {
-        erasedLineId = lineToErase.id;
-        return prev.filter((line) => line.id !== lineToErase.id);
+      const target = prev.find((line) => isPointNearLine(point, line));
+      if (target) {
+        erasedId = target.id;
+        return prev.filter((line) => line.id !== target.id);
       }
       return prev;
     });
-
-    return erasedLineId;
+    return erasedId;
   }, []);
 
-  const getLineAtPoint = useCallback((point: Point): string | null => {
-    const hoveredLine = lines.find((line) => isPointNearLine(point, line));
-    return hoveredLine ? hoveredLine.id : null;
-  }, [lines]);
-
-  const addLine = useCallback((line: Line) => {
-    setLines((prev) => [...prev, line]);
-  }, []);
-
-  const removeLine = useCallback((lineId: string) => {
-    setLines((prev) => prev.filter((line) => line.id !== lineId));
-  }, []);
-
-  const clearLines = useCallback(() => {
-    setLines([]);
-  }, []);
+  const getLineAtPoint = useCallback(
+    (point: Point): string | null => {
+      const line = lines.find((l) => isPointNearLine(point, l));
+      return line?.id ?? null;
+    },
+    [lines]
+  );
 
   return {
     lines,
@@ -86,9 +75,5 @@ export function useDrawing(): UseDrawingReturn {
     endDrawing,
     eraseLine,
     getLineAtPoint,
-    addLine,
-    removeLine,
-    clearLines,
   };
 }
-

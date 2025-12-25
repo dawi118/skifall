@@ -1,33 +1,42 @@
-// Game constants
-
 // Physics
 export const GRAVITY = 1;
 
-// Skier dimensions
+// Skier dimensions (base values - see lib/skier.ts for derived dimensions)
 export const SKIER_WIDTH = 20;
 export const SKIER_HEIGHT = 30;
 
 // Line drawing
 export const LINE_WIDTH = 4;
-export const LINE_COLOR = '#333333';
 
 // Camera
 export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 2;
 export const ZOOM_SPEED = 0.001;
-export const PAN_SPEED = 1;
-export const PLAYING_ZOOM = 1.5; // Zoom level when skier is moving
+export const PLAYING_ZOOM = 1.5;
 
-// Spawn position (will be replaced by level generator in Phase 2)
-export const SPAWN_POSITION = { x: 200, y: 100 };
+// Level bounds
+export const LEVEL_BOUNDS = {
+  maxWidth: 1920,
+  maxHeight: 1080,
+  minSeparation: 1 / 3,
+} as const;
+
+// Timer
+export const ROUND_DURATION_SECONDS = 60;
+
+// Scoring
+export const BASE_POINTS = 100;
 
 // Colors
 export const COLORS = {
   background: '#FAFAFA',
+  grid: '#E5E7EB',
   skier: '#1F2937',
   skis: '#EF4444',
+  head: '#FCD34D',
+  legs: '#374151',
   line: '#333333',
+  lineHighlight: '#6366F1',
   startZone: '#3B82F6',
   finishZone: '#22C55E',
 } as const;
-
