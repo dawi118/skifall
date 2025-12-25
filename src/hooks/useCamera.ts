@@ -93,17 +93,26 @@ export function useCamera(): UseCameraReturn {
   }, []);
 
   const updateAnimation = useCallback(() => {
-    if (targetZoom.current !== null) {
-      setCamera((prev) => {
-        const newZoom = lerp(prev.zoom, targetZoom.current!, CAMERA_LERP_SPEED);
-        // Stop animating when close enough
-        if (Math.abs(newZoom - targetZoom.current!) < 0.001) {
-          targetZoom.current = null;
-          return { ...prev, zoom: targetZoom.current! };
-        }
-        return { ...prev, zoom: newZoom };
-      });
-    }
+    // Early exit if no animation target
+    if (targetZoom.current === null) return;
+    
+    // CRITICAL: Capture target BEFORE calling setCamera to avoid race conditions.
+    // If we read targetZoom.current inside the setCamera callback, multiple 
+    // animation frames could queue up before React processes them, and by the 
+    // time the second callback runs, targetZoom.current might already be null.
+    const target = targetZoom.current;
+    
+    setCamera((prev) => {
+      const newZoom = lerp(prev.zoom, target, CAMERA_LERP_SPEED);
+      
+      // Stop animating when close enough - snap to exact target
+      if (Math.abs(newZoom - target) < 0.001) {
+        targetZoom.current = null;
+        return { ...prev, zoom: target };
+      }
+      
+      return { ...prev, zoom: newZoom };
+    });
   }, []);
 
   // Convert screen coordinates to world coordinates

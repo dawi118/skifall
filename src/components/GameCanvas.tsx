@@ -428,17 +428,22 @@ export function GameCanvas() {
   }, [currentTool, camera, drawing, physics]);
 
   // Handle wheel for zoom (always allowed, even when moving)
+  // Use a ref for the handler to avoid re-adding the event listener on every render
+  // (the `camera` object changes identity on each render due to useState)
+  const handleWheelRef = useRef(camera.handleWheel);
+  handleWheelRef.current = camera.handleWheel;
+  
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const handleWheel = (e: WheelEvent) => {
-      camera.handleWheel(e);
+      handleWheelRef.current(e);
     };
 
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
-  }, [camera]);
+  }, []); // Empty deps - handler accessed via stable ref
 
   // Handle middle-mouse pan
   const handleMiddleMouseDown = useCallback(
