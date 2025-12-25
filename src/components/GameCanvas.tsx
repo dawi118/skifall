@@ -8,30 +8,210 @@ import {
   COLORS,
   LINE_WIDTH,
   SKIER_WIDTH,
-  SKIER_HEIGHT,
   SPAWN_POSITION,
 } from '../lib/constants';
+import {
+  HEAD_RADIUS,
+  UPPER_BODY_HEIGHT,
+  LOWER_BODY_HEIGHT,
+  LOWER_BODY_WIDTH,
+  SKI_WIDTH,
+  SKI_HEIGHT,
+} from '../lib/physics';
 import './GameCanvas.css';
+
+// Helper drawing functions (pure functions, no hooks)
+function drawGrid(
+  ctx: CanvasRenderingContext2D,
+  cameraX: number,
+  cameraY: number,
+  zoom: number,
+  canvasWidth: number,
+  canvasHeight: number
+) {
+  const gridSize = 50;
+  
+  // Calculate visible area in world coordinates (with padding)
+  const viewWidth = canvasWidth / zoom;
+  const viewHeight = canvasHeight / zoom;
+  const padding = gridSize * 2;
+  
+  const left = cameraX - viewWidth / 2 - padding;
+  const right = cameraX + viewWidth / 2 + padding;
+  const top = cameraY - viewHeight / 2 - padding;
+  const bottom = cameraY + viewHeight / 2 + padding;
+  
+  // Snap to grid
+  const startX = Math.floor(left / gridSize) * gridSize;
+  const endX = Math.ceil(right / gridSize) * gridSize;
+  const startY = Math.floor(top / gridSize) * gridSize;
+  const endY = Math.ceil(bottom / gridSize) * gridSize;
+
+  ctx.strokeStyle = '#E5E7EB';
+  ctx.lineWidth = 1;
+
+  // Draw vertical lines
+  for (let x = startX; x <= endX; x += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(x, startY);
+    ctx.lineTo(x, endY);
+    ctx.stroke();
+  }
+
+  // Draw horizontal lines
+  for (let y = startY; y <= endY; y += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(startX, y);
+    ctx.lineTo(endX, y);
+    ctx.stroke();
+  }
+}
+
+function drawSpawnMarker(ctx: CanvasRenderingContext2D) {
+  ctx.fillStyle = COLORS.startZone;
+  ctx.globalAlpha = 0.3;
+  ctx.beginPath();
+  ctx.arc(SPAWN_POSITION.x, SPAWN_POSITION.y - 20, 30, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = COLORS.startZone;
+  ctx.font = 'bold 12px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText('START', SPAWN_POSITION.x, SPAWN_POSITION.y - 60);
+}
+
+function drawLine(
+  ctx: CanvasRenderingContext2D,
+  points: Point[],
+  color: string,
+  width: number
+) {
+  if (points.length < 2) return;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+
+  ctx.stroke();
+}
+
+// Skier dimensions
+interface SkierRenderState {
+  parts: {
+    head: { x: number; y: number; angle: number };
+    upper: { x: number; y: number; angle: number };
+    lower: { x: number; y: number; angle: number };
+    skis: { x: number; y: number; angle: number };
+  };
+  crashed: boolean;
+}
+
+function drawHead(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  // Head (yellow circle)
+  ctx.fillStyle = '#FCD34D';
+  ctx.beginPath();
+  ctx.arc(0, 0, HEAD_RADIUS, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawUpperBody(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  // Upper body (torso)
+  ctx.fillStyle = COLORS.skier;
+  ctx.fillRect(-SKIER_WIDTH / 2, -UPPER_BODY_HEIGHT / 2, SKIER_WIDTH, UPPER_BODY_HEIGHT);
+
+  ctx.restore();
+}
+
+function drawLowerBody(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  // Lower body (legs) - slightly narrower
+  ctx.fillStyle = '#374151'; // Slightly lighter than body
+  ctx.fillRect(-LOWER_BODY_WIDTH / 2, -LOWER_BODY_HEIGHT / 2, LOWER_BODY_WIDTH, LOWER_BODY_HEIGHT);
+
+  ctx.restore();
+}
+
+function drawSkis(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
+  // Skis (red rectangle)
+  ctx.fillStyle = COLORS.skis;
+  ctx.fillRect(-SKI_WIDTH / 2, -SKI_HEIGHT / 2, SKI_WIDTH, SKI_HEIGHT);
+
+  ctx.restore();
+}
+
+function drawSkier(ctx: CanvasRenderingContext2D, state: SkierRenderState) {
+  const { head, upper, lower, skis } = state.parts;
+  
+  // Draw from back to front: skis, lower body, upper body, head
+  drawSkis(ctx, skis.x, skis.y, skis.angle);
+  drawLowerBody(ctx, lower.x, lower.y, lower.angle);
+  drawUpperBody(ctx, upper.x, upper.y, upper.angle);
+  drawHead(ctx, head.x, head.y, head.angle);
+}
 
 export function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const lastTimeRef = useRef<number>(0);
 
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
-  const [currentTool, setCurrentTool] = useState<Tool>('pencil');
+  const [currentTool, setCurrentTool] = useState<Tool>('hand');
   const [skierState, setSkierState] = useState<SkierState>('idle');
-  const [skierPosition, setSkierPosition] = useState<Point>(SPAWN_POSITION);
-  const [skierAngle, setSkierAngle] = useState(0);
+  
+  // Calculate initial positions (from bottom up)
+  const skiCenterY = SPAWN_POSITION.y;
+  const ankleY = skiCenterY - SKI_HEIGHT / 2;
+  const lowerCenterY = ankleY - LOWER_BODY_HEIGHT / 2;
+  const hipY = lowerCenterY - LOWER_BODY_HEIGHT / 2;
+  const upperCenterY = hipY - UPPER_BODY_HEIGHT / 2;
+  const neckY = upperCenterY - UPPER_BODY_HEIGHT / 2;
+  const headCenterY = neckY - HEAD_RADIUS;
+
+  const [skierRenderState, setSkierRenderState] = useState<SkierRenderState>({
+    parts: {
+      head: { x: SPAWN_POSITION.x, y: headCenterY, angle: 0 },
+      upper: { x: SPAWN_POSITION.x, y: upperCenterY, angle: 0 },
+      lower: { x: SPAWN_POSITION.x, y: lowerCenterY, angle: 0 },
+      skis: { x: SPAWN_POSITION.x, y: skiCenterY, angle: 0 },
+    },
+    crashed: false,
+  });
 
   const physics = usePhysics();
-  const camera = useCamera(canvasSize);
+  const camera = useCamera();
   const drawing = useDrawing();
 
   // Initialize physics engine
   useEffect(() => {
     physics.initPhysics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle canvas resize
@@ -48,38 +228,7 @@ export function GameCanvas() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Game loop
-  useEffect(() => {
-    const gameLoop = (time: number) => {
-      const delta = lastTimeRef.current ? time - lastTimeRef.current : 16.67;
-      lastTimeRef.current = time;
-
-      // Update physics if skier is moving
-      if (skierState === 'moving') {
-        const result = physics.update(delta);
-        setSkierPosition(result.position);
-        setSkierAngle(result.angle);
-
-        // Follow skier with camera
-        camera.followTarget(result.position);
-      }
-
-      // Render
-      render();
-
-      animationFrameRef.current = requestAnimationFrame(gameLoop);
-    };
-
-    animationFrameRef.current = requestAnimationFrame(gameLoop);
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [skierState, physics, camera]);
-
-  // Render function
+  // Render function (uses refs to avoid stale closure issues)
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -103,8 +252,8 @@ export function GameCanvas() {
     ctx.scale(camera.camera.zoom, camera.camera.zoom);
     ctx.translate(-camera.camera.x, -camera.camera.y);
 
-    // Draw grid (for reference)
-    drawGrid(ctx);
+    // Draw grid (extends infinitely)
+    drawGrid(ctx, camera.camera.x, camera.camera.y, camera.camera.zoom, width, height);
 
     // Draw spawn point marker
     drawSpawnMarker(ctx);
@@ -120,104 +269,48 @@ export function GameCanvas() {
     }
 
     // Draw skier
-    drawSkier(ctx, skierPosition, skierAngle);
+    drawSkier(ctx, skierRenderState);
 
     // Restore context
     ctx.restore();
-  }, [canvasSize, camera.camera, drawing.lines, drawing.currentStroke, skierPosition, skierAngle]);
+  }, [canvasSize, camera.camera, drawing.lines, drawing.currentStroke, skierRenderState]);
 
-  // Draw a grid for visual reference
-  const drawGrid = (ctx: CanvasRenderingContext2D) => {
-    const gridSize = 50;
-    const extent = 2000;
+  // Game loop
+  useEffect(() => {
+    const gameLoop = (time: number) => {
+      const delta = lastTimeRef.current ? time - lastTimeRef.current : 16.67;
+      lastTimeRef.current = time;
 
-    ctx.strokeStyle = '#E5E7EB';
-    ctx.lineWidth = 1;
+      // Update physics if skier is moving or crashed (still animate crash)
+      if (skierState === 'moving' || skierState === 'fallen') {
+        const result = physics.update(delta);
+        setSkierRenderState(result);
 
-    for (let x = -extent; x <= extent; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, -extent);
-      ctx.lineTo(x, extent);
-      ctx.stroke();
-    }
+        // Update state if just crashed
+        if (result.crashed && skierState === 'moving') {
+          setSkierState('fallen');
+        }
 
-    for (let y = -extent; y <= extent; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(-extent, y);
-      ctx.lineTo(extent, y);
-      ctx.stroke();
-    }
-  };
+        // Follow skier upper body with camera
+        camera.followTarget({ x: result.parts.upper.x, y: result.parts.upper.y });
+      }
 
-  // Draw spawn point marker
-  const drawSpawnMarker = (ctx: CanvasRenderingContext2D) => {
-    ctx.fillStyle = COLORS.startZone;
-    ctx.globalAlpha = 0.3;
-    ctx.beginPath();
-    ctx.arc(SPAWN_POSITION.x, SPAWN_POSITION.y, 30, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+      // Render
+      render();
 
-    // Draw "START" text
-    ctx.fillStyle = COLORS.startZone;
-    ctx.font = 'bold 12px system-ui';
-    ctx.textAlign = 'center';
-    ctx.fillText('START', SPAWN_POSITION.x, SPAWN_POSITION.y - 40);
-  };
+      animationFrameRef.current = requestAnimationFrame(gameLoop);
+    };
 
-  // Draw a line from points
-  const drawLine = (
-    ctx: CanvasRenderingContext2D,
-    points: Point[],
-    color: string,
-    width: number
-  ) => {
-    if (points.length < 2) return;
+    animationFrameRef.current = requestAnimationFrame(gameLoop);
 
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [skierState, physics, camera, render]);
 
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-
-    for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(points[i].x, points[i].y);
-    }
-
-    ctx.stroke();
-  };
-
-  // Draw the skier
-  const drawSkier = (ctx: CanvasRenderingContext2D, position: Point, angle: number) => {
-    ctx.save();
-    ctx.translate(position.x, position.y);
-    ctx.rotate(angle);
-
-    // Body (rectangle)
-    ctx.fillStyle = COLORS.skier;
-    ctx.fillRect(-SKIER_WIDTH / 2, -SKIER_HEIGHT / 2, SKIER_WIDTH, SKIER_HEIGHT);
-
-    // Skis (red line at bottom)
-    ctx.strokeStyle = COLORS.skis;
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(-SKIER_WIDTH / 2 - 5, SKIER_HEIGHT / 2);
-    ctx.lineTo(SKIER_WIDTH / 2 + 10, SKIER_HEIGHT / 2);
-    ctx.stroke();
-
-    // Face indicator (small circle at top)
-    ctx.fillStyle = '#FCD34D';
-    ctx.beginPath();
-    ctx.arc(0, -SKIER_HEIGHT / 2 + 5, 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
-  };
-
-  // Handle pointer events for drawing
+  // Handle pointer events for tools
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (skierState === 'moving') return;
@@ -226,11 +319,14 @@ export function GameCanvas() {
       if (!canvas) return;
 
       const rect = canvas.getBoundingClientRect();
-      const worldPoint = camera.screenToWorld(e.clientX, e.clientY, rect);
 
-      if (currentTool === 'pencil') {
+      if (currentTool === 'hand') {
+        camera.handlePanStart(e.clientX, e.clientY);
+      } else if (currentTool === 'pencil') {
+        const worldPoint = camera.screenToWorld(e.clientX, e.clientY, rect);
         drawing.startDrawing(worldPoint);
       } else if (currentTool === 'eraser') {
+        const worldPoint = camera.screenToWorld(e.clientX, e.clientY, rect);
         const erasedId = drawing.eraseLine(worldPoint);
         if (erasedId) {
           physics.removeLine(erasedId);
@@ -249,7 +345,9 @@ export function GameCanvas() {
 
       const rect = canvas.getBoundingClientRect();
 
-      if (currentTool === 'pencil' && drawing.isDrawing) {
+      if (currentTool === 'hand') {
+        camera.handlePanMove(e.clientX, e.clientY);
+      } else if (currentTool === 'pencil' && drawing.isDrawing) {
         const worldPoint = camera.screenToWorld(e.clientX, e.clientY, rect);
         drawing.continueDrawing(worldPoint);
       } else if (currentTool === 'eraser' && e.buttons > 0) {
@@ -264,13 +362,15 @@ export function GameCanvas() {
   );
 
   const handlePointerUp = useCallback(() => {
-    if (currentTool === 'pencil') {
+    if (currentTool === 'hand') {
+      camera.handlePanEnd();
+    } else if (currentTool === 'pencil') {
       const newLine = drawing.endDrawing();
       if (newLine) {
         physics.addLine(newLine);
       }
     }
-  }, [currentTool, drawing, physics]);
+  }, [currentTool, camera, drawing, physics]);
 
   // Handle wheel for zoom
   useEffect(() => {
@@ -322,10 +422,17 @@ export function GameCanvas() {
   const handleReset = useCallback(() => {
     setSkierState('idle');
     physics.reset();
-    setSkierPosition(SPAWN_POSITION);
-    setSkierAngle(0);
+    setSkierRenderState({
+      parts: {
+        head: { x: SPAWN_POSITION.x, y: headCenterY, angle: 0 },
+        upper: { x: SPAWN_POSITION.x, y: upperCenterY, angle: 0 },
+        lower: { x: SPAWN_POSITION.x, y: lowerCenterY, angle: 0 },
+        skis: { x: SPAWN_POSITION.x, y: skiCenterY, angle: 0 },
+      },
+      crashed: false,
+    });
     camera.resetCamera();
-  }, [physics, camera]);
+  }, [physics, camera, headCenterY, upperCenterY, lowerCenterY, skiCenterY]);
 
   return (
     <div className="game-container" ref={containerRef}>
@@ -343,14 +450,22 @@ export function GameCanvas() {
         onMouseUp={handleMiddleMouseUp}
         onMouseLeave={handleMiddleMouseUp}
       />
+      
+      {/* Top right controls */}
+      <div className="top-controls">
+        <button
+          className={`start-btn ${skierState !== 'idle' ? 'reset' : ''}`}
+          onClick={skierState !== 'idle' ? handleReset : handlePlay}
+        >
+          {skierState !== 'idle' ? '↺ Reset' : 'Start'}
+        </button>
+      </div>
+
       <Toolbar
         currentTool={currentTool}
         skierState={skierState}
         onToolChange={setCurrentTool}
-        onPlay={handlePlay}
-        onReset={handleReset}
       />
     </div>
   );
 }
-

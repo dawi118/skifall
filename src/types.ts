@@ -10,7 +10,7 @@ export interface Line {
   points: Point[];
 }
 
-export type Tool = 'pencil' | 'eraser';
+export type Tool = 'hand' | 'pencil' | 'eraser';
 
 export type SkierState = 'idle' | 'moving' | 'fallen' | 'finished';
 

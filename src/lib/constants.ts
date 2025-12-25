@@ -2,9 +2,6 @@
 
 // Physics
 export const GRAVITY = 1;
-export const SKIER_FRICTION = 0.0000;  // Extremely low - like ice
-export const LINE_FRICTION = 0.0000;   // Extremely slippery lines
-export const RESTITUTION = 0;          // No bounce
 
 // Skier dimensions
 export const SKIER_WIDTH = 20;

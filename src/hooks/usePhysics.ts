@@ -7,10 +7,17 @@ import {
   startSkier,
   stepPhysics,
   getSkierPosition,
-  getSkierAngle,
+  getSkierParts,
+  hasCrashed,
   type PhysicsEngine,
+  type SkierParts,
 } from '../lib/physics';
 import type { Line, Point } from '../types';
+
+interface SkierState {
+  parts: SkierParts;
+  crashed: boolean;
+}
 
 interface UsePhysicsReturn {
   physicsRef: React.MutableRefObject<PhysicsEngine | null>;
@@ -19,7 +26,7 @@ interface UsePhysicsReturn {
   removeLine: (lineId: string) => void;
   reset: () => void;
   play: () => void;
-  update: (delta: number) => { position: Point; angle: number };
+  update: (delta: number) => SkierState;
   getPosition: () => Point;
 }
 
@@ -54,15 +61,23 @@ export function usePhysics(): UsePhysicsReturn {
     }
   }, []);
 
-  const update = useCallback((delta: number) => {
+  const update = useCallback((delta: number): SkierState => {
     if (physicsRef.current) {
       stepPhysics(physicsRef.current, delta);
       return {
-        position: getSkierPosition(physicsRef.current),
-        angle: getSkierAngle(physicsRef.current),
+        parts: getSkierParts(physicsRef.current),
+        crashed: hasCrashed(physicsRef.current),
       };
     }
-    return { position: { x: 0, y: 0 }, angle: 0 };
+    return {
+      parts: {
+        head: { x: 0, y: 0, angle: 0 },
+        upper: { x: 0, y: 0, angle: 0 },
+        lower: { x: 0, y: 0, angle: 0 },
+        skis: { x: 0, y: 0, angle: 0 },
+      },
+      crashed: false,
+    };
   }, []);
 
   const getPosition = useCallback(() => {
@@ -72,7 +87,6 @@ export function usePhysics(): UsePhysicsReturn {
     return { x: 0, y: 0 };
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       physicsRef.current = null;
@@ -90,4 +104,3 @@ export function usePhysics(): UsePhysicsReturn {
     getPosition,
   };
 }
-

@@ -15,7 +15,7 @@ interface UseCameraReturn {
   worldToScreen: (worldX: number, worldY: number, canvasRect: DOMRect) => Point;
 }
 
-export function useCamera(_canvasSize: { width: number; height: number }): UseCameraReturn {
+export function useCamera(): UseCameraReturn {
   // Camera position is the world coordinate at the center of the screen
   const [camera, setCamera] = useState<Camera>({
     x: SPAWN_POSITION.x,
