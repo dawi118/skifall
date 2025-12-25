@@ -232,6 +232,19 @@ export function GameCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Sync physics lines with drawing lines (handles HMR and state resets)
+  useEffect(() => {
+    const physicsLineIds = physics.getLineIds();
+    const drawingLineIds = new Set(drawing.lines.map(l => l.id));
+    
+    // Remove any physics lines that don't exist in drawing state
+    for (const physicsLineId of physicsLineIds) {
+      if (!drawingLineIds.has(physicsLineId)) {
+        physics.removeLine(physicsLineId);
+      }
+    }
+  }, [drawing.lines, physics]);
+
   // Handle canvas resize
   useEffect(() => {
     const handleResize = () => {

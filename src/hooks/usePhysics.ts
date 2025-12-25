@@ -24,6 +24,8 @@ interface UsePhysicsReturn {
   initPhysics: () => void;
   addLine: (line: Line) => void;
   removeLine: (lineId: string) => void;
+  clearAllLines: () => void;
+  getLineIds: () => string[];
   reset: () => void;
   play: () => void;
   update: (delta: number) => SkierState;
@@ -47,6 +49,23 @@ export function usePhysics(): UsePhysicsReturn {
     if (physicsRef.current) {
       removeLineFromWorld(physicsRef.current, lineId);
     }
+  }, []);
+
+  const clearAllLines = useCallback(() => {
+    if (physicsRef.current) {
+      // Get all line IDs and remove them
+      const lineIds = Array.from(physicsRef.current.lineFixtures.keys());
+      for (const lineId of lineIds) {
+        removeLineFromWorld(physicsRef.current, lineId);
+      }
+    }
+  }, []);
+
+  const getLineIds = useCallback((): string[] => {
+    if (physicsRef.current) {
+      return Array.from(physicsRef.current.lineFixtures.keys());
+    }
+    return [];
   }, []);
 
   const reset = useCallback(() => {
@@ -98,6 +117,8 @@ export function usePhysics(): UsePhysicsReturn {
     initPhysics,
     addLine,
     removeLine,
+    clearAllLines,
+    getLineIds,
     reset,
     play,
     update,
