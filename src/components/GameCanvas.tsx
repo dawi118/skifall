@@ -23,36 +23,44 @@ const ANIM_SPEED = 0.15;
 const SKIER_BROADCAST_INTERVAL = 66; // ~15Hz
 const GHOST_LERP_SPEED = 0.25;
 
-function isAnimationDone(current: number, target: number): boolean {
-  return Math.abs(current - target) < 0.02;
+function isAnimationDone(current: number, target: number, threshold = 0.02): boolean {
+  return Math.abs(current - target) < threshold;
+}
+
+function animateToward(
+  current: number,
+  target: number,
+  speed: number
+): { value: number; done: boolean } {
+  const next = current + (target - current) * speed;
+  const done = Math.abs(next - target) < 0.01;
+  return { value: done ? target : next, done };
 }
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+interface BodyPart {
+  x: number;
+  y: number;
+  angle: number;
+}
+
+function lerpBodyPart(current: BodyPart, target: BodyPart, t: number): BodyPart {
+  return {
+    x: lerp(current.x, target.x, t),
+    y: lerp(current.y, target.y, t),
+    angle: lerp(current.angle, target.angle, t),
+  };
+}
+
 function lerpSkierState(current: SkierRenderState, target: SkierRenderState, t: number): SkierRenderState {
   return {
-    head: {
-      x: lerp(current.head.x, target.head.x, t),
-      y: lerp(current.head.y, target.head.y, t),
-      angle: lerp(current.head.angle, target.head.angle, t),
-    },
-    upper: {
-      x: lerp(current.upper.x, target.upper.x, t),
-      y: lerp(current.upper.y, target.upper.y, t),
-      angle: lerp(current.upper.angle, target.upper.angle, t),
-    },
-    lower: {
-      x: lerp(current.lower.x, target.lower.x, t),
-      y: lerp(current.lower.y, target.lower.y, t),
-      angle: lerp(current.lower.angle, target.lower.angle, t),
-    },
-    skis: {
-      x: lerp(current.skis.x, target.skis.x, t),
-      y: lerp(current.skis.y, target.skis.y, t),
-      angle: lerp(current.skis.angle, target.skis.angle, t),
-    },
+    head: lerpBodyPart(current.head, target.head, t),
+    upper: lerpBodyPart(current.upper, target.upper, t),
+    lower: lerpBodyPart(current.lower, target.lower, t),
+    skis: lerpBodyPart(current.skis, target.skis, t),
     crashed: target.crashed,
   };
 }
@@ -235,15 +243,8 @@ export function GameCanvas({
     for (const line of remoteLines) {
       const linePlayer = players.find(p => p.id === line.playerId);
       const color = linePlayer?.color ?? COLORS.line;
-      
-      let opacity: number;
-      if (hoveredPlayerId === null) {
-        opacity = 0.2;
-      } else if (line.playerId === hoveredPlayerId) {
-        opacity = 0.4;
-      } else {
-        opacity = 0;
-      }
+      const isHovered = line.playerId === hoveredPlayerId;
+      const opacity = hoveredPlayerId === null ? 0.2 : isHovered ? 0.4 : 0;
       
       if (opacity > 0) {
         drawLine(ctx, line.points, false, opacity * portalScale, color);
@@ -256,7 +257,6 @@ export function GameCanvas({
       drawLine(ctx, player.currentStroke);
     }
 
-    // Draw interpolated ghost skiers
     for (const [playerId, interpolatedState] of interpolatedSkiersRef.current) {
       const skierPlayer = players.find(p => p.id === playerId);
       if (skierPlayer) {
@@ -291,7 +291,6 @@ export function GameCanvas({
 
         camera.followTarget({ x: result.upper.x, y: result.upper.y });
         
-        // Broadcast skier position at ~15Hz
         const now = performance.now();
         if (now - lastSkierBroadcastRef.current >= SKIER_BROADCAST_INTERVAL) {
           lastSkierBroadcastRef.current = now;
@@ -303,25 +302,17 @@ export function GameCanvas({
 
       if (skierScaleTarget.current !== null) {
         setSkierScale((prev) => {
-          const target = skierScaleTarget.current!;
-          const next = prev + (target - prev) * ANIM_SPEED;
-          if (Math.abs(next - target) < 0.01) {
-            skierScaleTarget.current = null;
-            return target;
-          }
-          return next;
+          const { value, done } = animateToward(prev, skierScaleTarget.current!, ANIM_SPEED);
+          if (done) skierScaleTarget.current = null;
+          return value;
         });
       }
 
       if (portalScaleTarget.current !== null) {
         setPortalScale((prev) => {
-          const target = portalScaleTarget.current!;
-          const next = prev + (target - prev) * ANIM_SPEED;
-          if (Math.abs(next - target) < 0.01) {
-            portalScaleTarget.current = null;
-            return target;
-          }
-          return next;
+          const { value, done } = animateToward(prev, portalScaleTarget.current!, ANIM_SPEED);
+          if (done) portalScaleTarget.current = null;
+          return value;
         });
       }
 
@@ -472,8 +463,6 @@ export function GameCanvas({
     actions.reset(level.start.x, level.start.y);
     gameState.resetRound();
     setShowRoundComplete(false);
-    
-
     onSkierPosition?.(player.skierRenderState, 'idle');
 
     setSkierVisible(false);

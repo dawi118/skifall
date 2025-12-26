@@ -91,7 +91,6 @@ export function drawGhostSkier(
   ctx.save();
   ctx.globalAlpha = opacity;
 
-  // Draw all parts in the player's color
   drawPart(ctx, skis.x, skis.y, skis.angle, () => {
     ctx.fillStyle = color;
     ctx.fillRect(-SKI_WIDTH / 2, -SKI_HEIGHT / 2, SKI_WIDTH, SKI_HEIGHT);

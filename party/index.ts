@@ -83,7 +83,6 @@ export default class SkiFallServer implements PartyKitServer {
   onClose(conn: Connection) {
     this.players.delete(conn.id);
     
-    // Remove all lines from this player
     const removedLineIds: string[] = [];
     for (const [lineId, line] of this.lines) {
       if (line.playerId === conn.id) {
@@ -147,7 +146,6 @@ export default class SkiFallServer implements PartyKitServer {
       }
       
       if (data.type === 'lines-clear') {
-        // Remove all lines for this player
         for (const [lineId, line] of this.lines) {
           if (line.playerId === sender.id) {
             this.lines.delete(lineId);
