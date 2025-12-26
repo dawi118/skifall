@@ -1,0 +1,25 @@
+[build]
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Production context (main branch)
+[context.production]
+  command = "npm run build"
+  # Set VITE_PARTYKIT_HOST in Netlify UI for production
+
+# Branch deploy context - builds preview PartyKit URL from branch name
+[context.branch-deploy]
+  command = "VITE_PARTYKIT_HOST=\"ski-fall-${BRANCH/\\//-}.$PARTYKIT_USERNAME.partykit.dev\" npm run build"
+
+# Deploy previews for PRs - same as branch deploy
+[context.deploy-preview]
+  command = "VITE_PARTYKIT_HOST=\"ski-fall-${HEAD/\\//-}.$PARTYKIT_USERNAME.partykit.dev\" npm run build"
+
+# SPA routing - send all routes to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+

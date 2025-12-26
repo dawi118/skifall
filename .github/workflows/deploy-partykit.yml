@@ -1,0 +1,48 @@
+name: Deploy PartyKit
+
+on:
+  push:
+    branches:
+      - main
+      - '**'
+    paths:
+      - 'party/**'
+      - 'partykit.json'
+      - '.github/workflows/deploy-partykit.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - run: npm ci
+      
+      - name: Deploy to PartyKit (Production)
+        if: github.ref == 'refs/heads/main'
+        run: npx partykit deploy
+        env:
+          PARTYKIT_TOKEN: ${{ secrets.PARTYKIT_TOKEN }}
+      
+      - name: Deploy to PartyKit (Preview)
+        if: github.ref != 'refs/heads/main'
+        run: |
+          BRANCH_NAME="${GITHUB_REF_NAME//\//-}"
+          npx partykit deploy --name "ski-fall-${BRANCH_NAME}"
+        env:
+          PARTYKIT_TOKEN: ${{ secrets.PARTYKIT_TOKEN }}
+      
+      - name: Output deployment URL
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "🚀 Deployed to: https://ski-fall.${{ vars.PARTYKIT_USERNAME }}.partykit.dev"
+          else
+            BRANCH_NAME="${GITHUB_REF_NAME//\//-}"
+            echo "🔧 Preview deployed to: https://ski-fall-${BRANCH_NAME}.${{ vars.PARTYKIT_USERNAME }}.partykit.dev"
+          fi
+

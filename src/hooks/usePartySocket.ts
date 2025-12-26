@@ -32,9 +32,7 @@ export interface RemoteSkier {
   timestamp: number;
 }
 
-const PARTYKIT_HOST = import.meta.env.DEV 
-  ? 'localhost:1999' 
-  : 'ski-fall.your-username.partykit.dev';
+const PARTYKIT_HOST = import.meta.env.VITE_PARTYKIT_HOST || 'localhost:1999';
 
 export function usePartySocket(roomId: string | null) {
   const [isConnected, setIsConnected] = useState(false);
