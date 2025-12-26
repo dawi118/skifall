@@ -26,7 +26,7 @@ export function RoundComplete({
   const isReady = localPlayer?.isReady ?? false;
   const readyCount = players.filter(p => p.isReady).length;
   const allReady = players.length > 0 && players.every(p => p.isReady);
-
+  
   return (
     <div className="round-complete-overlay">
       <div className="round-complete-card">
@@ -44,7 +44,7 @@ export function RoundComplete({
             </>
           )}
         </div>
-
+        
         <div className="leaderboard">
           <div className="leaderboard-header">
             <span className="lb-rank">Rank</span>
@@ -82,16 +82,16 @@ export function RoundComplete({
                   <span className="round-score">+{roundScore}</span>
                 </span>
                 <span className="lb-total">{player.totalScore}</span>
-              </div>
+          </div>
             );
           })}
         </div>
-
+        
         <div className="round-complete-actions">
           {isGameOver ? (
             <button className="next-level-btn" onClick={onPlayAgain}>
               Play Again
-            </button>
+          </button>
           ) : (
             <>
               <button 
@@ -100,7 +100,7 @@ export function RoundComplete({
                 disabled={isReady}
               >
                 {isReady ? 'Waiting for others...' : 'Ready for Next Round →'}
-              </button>
+          </button>
               <p className="ready-count">
                 {allReady ? 'Starting next round...' : `${readyCount}/${players.length} ready`}
               </p>

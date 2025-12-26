@@ -15,7 +15,7 @@ export interface Player {
   name: string;
   color: string;
   avatar: string;
-  character: number; // 1-4 for skier sprites
+  character: number;
   isReady: boolean;
   isSpectating: boolean;
   roundResult: RoundResult | null;

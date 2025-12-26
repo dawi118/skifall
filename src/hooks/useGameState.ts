@@ -37,7 +37,7 @@ export function useGameState(initialLevel?: Level | null): UseGameStateReturn {
       setLevelState(pendingLevelRef.current);
       pendingLevelRef.current = null;
       setPendingLevel(null);
-      setRoundResult(null);
+    setRoundResult(null);
     }
   }, []);
 

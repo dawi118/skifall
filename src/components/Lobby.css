@@ -37,6 +37,16 @@
   padding: 16px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.room-code-section:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.room-code-section:active {
+  transform: scale(0.98);
 }
 
 .room-code-label {
@@ -53,6 +63,18 @@
   font-size: 1.5rem;
   font-weight: bold;
   color: #60a5fa;
+}
+
+.room-code-section .copy-hint {
+  display: block;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 8px;
+  transition: color 0.2s;
+}
+
+.room-code-section .copy-hint.copied {
+  color: #22c55e;
 }
 
 .section-title {

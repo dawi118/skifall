@@ -13,15 +13,15 @@ export const SKI_WIDTH = SKIER_WIDTH * 1.5;
 export const SKI_HEIGHT = 4;
 
 // Sprite rendering scale (pixels in sprite -> world units)
-const SPRITE_SCALE = 0.25;
+const SPRITE_SCALE = 0.1;
 
 // Offsets to align sprite visual centers with physics body centers
 // The sprites are designed as stacking parts, but physics bodies have different centers
 // Negative Y moves sprite up, positive Y moves sprite down
 const SPRITE_OFFSETS = {
-  head: { x: 10, y: -40 },   // Head sprite - position above physics center (hat is tall)
-  torso: { x: -8, y: -12 },  // Torso - shift up (sprite includes shoulders above center)
-  legs: { x: 0, y: -11 },    // Legs - shift up (sprite has waistband above center)
+  head: { x: 0, y: 0 },   // Head sprite - position above physics center (hat is tall)
+  torso: { x: -5, y: 5 },  // Torso - shift up (sprite includes shoulders above center)
+  legs: { x: 0, y: 0 },    // Legs - shift up (sprite has waistband above center)
   skis: { x: 0, y: 0 },     // Skis - keep centered
 };
 

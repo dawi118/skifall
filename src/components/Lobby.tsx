@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Player } from '../hooks/usePartySocket';
 import './Lobby.css';
 
@@ -20,19 +21,29 @@ export function Lobby({
   onSetReady,
   onSetTotalRounds,
 }: LobbyProps) {
+  const [copied, setCopied] = useState(false);
   const localPlayer = players.find(p => p.id === localPlayerId);
   const isReady = localPlayer?.isReady ?? false;
   const allReady = players.length > 0 && players.every(p => p.isReady);
   const readyCount = players.filter(p => p.isReady).length;
+
+  const handleCopyCode = async () => {
+    await navigator.clipboard.writeText(roomCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div className="lobby">
       <div className="lobby-card">
         <h1 className="lobby-title">SKI FALL</h1>
         
-        <div className="room-code-section">
+        <div className="room-code-section" onClick={handleCopyCode}>
           <span className="room-code-label">Room Code</span>
           <span className="room-code">{roomCode}</span>
+          <span className={`copy-hint ${copied ? 'copied' : ''}`}>
+            {copied ? '✓ copied!' : 'click to copy'}
+          </span>
         </div>
 
         <div className="players-section">

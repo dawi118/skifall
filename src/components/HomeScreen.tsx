@@ -1,32 +1,57 @@
 import { useState } from 'react';
 import { generateRoomCode, isValidRoomCode } from '../lib/room-codes';
+import { audioManager } from '../lib/audio';
+import type { Player } from '../hooks/usePartySocket';
 import backgroundGif from '../assets/images/homepage chalet advanced.gif';
 import logoImage from '../assets/images/skifall_logo_transparent.png';
+import hostGameBtn from '../assets/images/host-game.png';
+import joinLobbyBtn from '../assets/images/join-lobby.png';
 import './HomeScreen.css';
 
 interface HomeScreenProps {
   onJoinRoom: (roomId: string) => void;
+  hasStarted: boolean;
+  onStart: () => void;
+  isInLobby?: boolean;
+  roomCode?: string;
+  players?: Player[];
+  localPlayerId?: string | null;
+  totalRounds?: number;
+  roundOptions?: number[];
+  onSetReady?: (isReady: boolean) => void;
+  onSetTotalRounds?: (rounds: number) => void;
 }
 
-export function HomeScreen({ onJoinRoom }: HomeScreenProps) {
-  const [mode, setMode] = useState<'home' | 'create' | 'join'>('home');
-  const [roomCode, setRoomCode] = useState('');
-  const [generatedCode, setGeneratedCode] = useState('');
+export function HomeScreen({ 
+  onJoinRoom, 
+  hasStarted, 
+  onStart,
+  isInLobby = false,
+  roomCode: lobbyRoomCode = '',
+  players = [],
+  localPlayerId,
+  totalRounds = 5,
+  roundOptions = [3, 5, 7, 10],
+  onSetReady,
+  onSetTotalRounds,
+}: HomeScreenProps) {
+  const [mode, setMode] = useState<'home' | 'join'>('home');
+  const [joinRoomCode, setJoinRoomCode] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const handleCreate = () => {
-    const code = generateRoomCode();
-    setGeneratedCode(code);
-    setMode('create');
+  const handleStart = () => {
+    onStart();
+    audioManager.play('start');
   };
 
-  const handleStartGame = () => {
-    onJoinRoom(generatedCode);
+  const handleHostGame = () => {
+    const code = generateRoomCode();
+    onJoinRoom(code);
   };
 
   const handleJoinSubmit = () => {
-    const code = roomCode.toLowerCase().trim();
+    const code = joinRoomCode.toLowerCase().trim();
     if (!isValidRoomCode(code)) {
       setError('Invalid code format');
       return;
@@ -37,15 +62,25 @@ export function HomeScreen({ onJoinRoom }: HomeScreenProps) {
 
   const handleBack = () => {
     setMode('home');
-    setRoomCode('');
+    setJoinRoomCode('');
     setError('');
   };
 
   const handleCopyCode = async () => {
-    await navigator.clipboard.writeText(generatedCode);
+    await navigator.clipboard.writeText(lobbyRoomCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  // Lobby state
+  const localPlayer = players.find(p => p.id === localPlayerId);
+  const isReady = localPlayer?.isReady ?? false;
+  const allReady = players.length > 0 && players.every(p => p.isReady);
+  const readyCount = players.filter(p => p.isReady).length;
+
+  // Determine logo state: 'splash' -> 'menu' -> 'lobby'
+  const logoState = !hasStarted ? 'splash' : isInLobby ? 'lobby' : 'menu';
+  const showButtons = hasStarted && !isInLobby && mode === 'home';
 
   return (
     <div className="home-screen">
@@ -53,46 +88,54 @@ export function HomeScreen({ onJoinRoom }: HomeScreenProps) {
         className="background-layer"
         style={{ backgroundImage: `url(${backgroundGif})` }}
       />
-      <div className="content-layer">
-        <img src={logoImage} alt="SKI FALL" className="game-logo" />
 
-      {mode === 'home' && (
-        <div className="floating-buttons">
-          <button className="floating-btn primary" onClick={handleCreate}>
-            Create Game
-          </button>
-          <button className="floating-btn secondary" onClick={() => setMode('join')}>
-            Join Game
-          </button>
+      {/* Single logo that transitions between states */}
+      <img 
+        src={logoImage} 
+        alt="SKI FALL" 
+        className={`home-logo logo-${logoState}`} 
+      />
+
+      {/* Start overlay - always in DOM, fades out */}
+      <div 
+        className={`start-overlay ${hasStarted ? 'hidden' : ''}`} 
+        onClick={!hasStarted ? handleStart : undefined}
+      >
+        <div className="click-to-start">Click to Start</div>
+      </div>
+
+      {/* Content layer - always in DOM */}
+      <div className={`content-layer ${isInLobby ? 'lobby-mode' : ''} ${hasStarted ? 'visible' : ''}`}>
+        {/* Menu buttons - staggered pop-in */}
+        <div className={`floating-buttons ${showButtons ? 'visible' : 'hidden'}`}>
+          <img 
+            src={hostGameBtn} 
+            alt="Host Game" 
+            aria-label="Host Game"
+            aria-role="button"
+            className="menu-btn btn-1" 
+            onClick={handleHostGame}
+          />
+          <img 
+            src={joinLobbyBtn} 
+            alt="Join Lobby" 
+            aria-label="Join Lobby"
+            aria-role="button"
+            className="menu-btn btn-2" 
+            onClick={() => setMode('join')}
+          />
         </div>
-      )}
 
-      {mode === 'create' && (
-        <div className="floating-panel">
-          <div className="room-code-display" onClick={handleCopyCode}>
-            {generatedCode}
-            <span className={`copy-hint ${copied ? 'copied' : ''}`}>
-              {copied ? 'copied!' : 'click to copy'}
-            </span>
-          </div>
-          <div className="panel-buttons">
-            <button className="floating-btn secondary small" onClick={handleBack}>← Back</button>
-            <button className="floating-btn primary small" onClick={handleStartGame}>Start →</button>
-          </div>
-        </div>
-      )}
-
-      {mode === 'join' && (
-        <div className="floating-panel">
+        {/* Join panel */}
+        <div className={`floating-panel ${mode !== 'join' || isInLobby ? 'hidden' : ''}`}>
           <label className="input-label">type in your code</label>
           <input
             type="text"
             className="room-input"
             placeholder="verbier-matterhorn"
-            value={roomCode}
-            onChange={(e) => setRoomCode(e.target.value)}
+            value={joinRoomCode}
+            onChange={(e) => setJoinRoomCode(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleJoinSubmit()}
-            autoFocus
           />
           {error && <p className="error-text">{error}</p>}
           <div className="panel-buttons">
@@ -100,7 +143,62 @@ export function HomeScreen({ onJoinRoom }: HomeScreenProps) {
             <button className="floating-btn primary small" onClick={handleJoinSubmit}>Join →</button>
           </div>
         </div>
-      )}
+
+        {/* Lobby content - always in DOM, animated in when in lobby */}
+        <div className={`lobby-content ${isInLobby ? 'visible' : ''}`}>
+          <div className="lobby-room-code" onClick={handleCopyCode}>
+            <span className="lobby-code-value">{lobbyRoomCode}</span>
+            <span className={`lobby-copy-hint ${copied ? 'copied' : ''}`}>
+              {copied ? '✓ copied!' : 'click to copy'}
+            </span>
+          </div>
+
+          <div className="lobby-players">
+            <div className="lobby-section-title">Players ({players.length})</div>
+            <div className="lobby-player-list">
+              {players.map(player => (
+                <div 
+                  key={player.id} 
+                  className={`lobby-player ${player.isReady ? 'ready' : ''} ${player.id === localPlayerId ? 'local' : ''}`}
+                >
+                  <span className="lobby-player-avatar" style={{ borderColor: player.color }}>
+                    {player.avatar}
+                  </span>
+                  <span className="lobby-player-name">{player.name}</span>
+                  <span className={`lobby-ready-badge ${player.isReady ? 'ready' : ''}`}>
+                    {player.isReady ? '✓' : '...'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="lobby-settings">
+            <div className="lobby-section-title">Rounds</div>
+            <div className="lobby-round-options">
+              {roundOptions.map(option => (
+                <button
+                  key={option}
+                  className={`lobby-round-btn ${totalRounds === option ? 'selected' : ''}`}
+                  onClick={() => onSetTotalRounds?.(option)}
+                  disabled={isReady}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            className={`lobby-ready-button ${isReady ? 'is-ready' : ''}`}
+            onClick={() => onSetReady?.(!isReady)}
+          >
+            {isReady ? 'Cancel' : "I'm Ready!"}
+          </button>
+          <div className="lobby-status">
+            {allReady ? 'Starting game...' : `${readyCount}/${players.length} ready`}
+          </div>
+        </div>
       </div>
     </div>
   );

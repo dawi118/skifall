@@ -1,6 +1,3 @@
-// Sprite loading and management for character assets
-
-// Import all skier sprites
 import skier1Head from '../assets/characters/skier1/separated/skier1_head.png';
 import skier1Torso from '../assets/characters/skier1/separated/skier1_torso.png';
 import skier1Legs from '../assets/characters/skier1/separated/skier1_legs.png';

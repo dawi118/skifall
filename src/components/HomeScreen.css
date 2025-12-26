@@ -1,7 +1,91 @@
 .home-screen {
   min-height: 100vh;
+  height: 100vh;
   position: relative;
   overflow: hidden;
+}
+
+/* Single logo that transitions between states */
+.home-logo {
+  position: absolute;
+  z-index: 15;
+  filter: drop-shadow(0 8px 40px rgba(0, 0, 0, 0.5));
+  transition: top 0.6s cubic-bezier(0.4, 0, 0.2, 1), 
+              width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Splash state - centered, pulsing */
+.home-logo.logo-splash {
+  width: 450px;
+  max-width: 85vw;
+  top: calc(50% - 180px);
+  animation: logo-pulse 2s ease-in-out infinite;
+}
+
+/* Menu state - higher up, bobbing */
+.home-logo.logo-menu {
+  width: 400px;
+  max-width: 80vw;
+  top: 22vh;
+  animation: logo-bob 3s ease-in-out infinite;
+}
+
+/* Lobby state - smaller, at top */
+.home-logo.logo-lobby {
+  width: 240px;
+  max-width: 70vw;
+  top: 30px;
+  animation: logo-bob 3s ease-in-out infinite;
+}
+
+@keyframes logo-pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.03); }
+}
+
+@keyframes logo-bob {
+  0%, 100% { transform: translateX(-50%) translateY(0px); }
+  50% { transform: translateX(-50%) translateY(8px); }
+}
+
+/* Click to start overlay - fades out */
+.start-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.3);
+  transition: opacity 0.5s ease-out;
+  opacity: 1;
+}
+
+.start-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.click-to-start {
+  margin-top: 120px;
+  font-family: 'Courier New', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  animation: click-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes click-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .background-layer {
@@ -22,46 +106,83 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 20px;
+  padding-top: calc(22vh + 180px);
+  transition: padding-top 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  pointer-events: none;
 }
 
-.game-logo {
-  width: 400px;
-  max-width: 80vw;
-  height: auto;
-  margin-bottom: 80px;
-  margin-top: -80px;
-  animation: 
-    logo-drop-in 2.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
-    logo-bob 3s ease-in-out 2.5s infinite;
-  filter: drop-shadow(0 8px 30px rgba(0, 0, 0, 0.4));
+.content-layer.visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-@keyframes logo-drop-in {
-  0% {
-    transform: translateY(-200px);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes logo-bob {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(10px);
-  }
+.content-layer.lobby-mode {
+  padding-top: 140px;
 }
 
 .floating-buttons {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  align-items: center;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.floating-buttons.hidden {
+  pointer-events: none;
+  max-height: 0;
+  overflow: hidden;
+  margin: 0;
+  gap: 0;
+}
+
+.floating-buttons.hidden .menu-btn {
+  opacity: 0;
+  transform: translateY(30px) scale(0.9);
+}
+
+.floating-buttons.visible .menu-btn {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: all 0.15s ease;
+}
+
+/* Staggered button animations */
+.menu-btn.btn-1 {
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s;
+}
+
+.menu-btn.btn-2 {
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.45s;
+}
+
+.floating-buttons.hidden .menu-btn.btn-1,
+.floating-buttons.hidden .menu-btn.btn-2 {
+  transition-delay: 0s;
+}
+
+.menu-btn {
+  width: 280px;
+  max-width: 80vw;
+  height: auto;
+  cursor: pointer;
+  filter: drop-shadow(0 4px 15px rgba(0, 0, 0, 0.3));
+  opacity: 0;
+  transform: translateY(30px) scale(0.9);
+}
+
+.floating-buttons.visible .menu-btn:hover {
+  transform: scale(1.05) translateY(-2px);
+  filter: drop-shadow(0 8px 25px rgba(0, 0, 0, 0.4));
+  transition: all 0.15s ease;
+}
+
+.floating-buttons.visible .menu-btn:active {
+  transform: scale(0.98);
+  transition: all 0.1s ease;
 }
 
 .floating-btn {
@@ -111,6 +232,19 @@
   flex-direction: column;
   align-items: center;
   gap: 20px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.floating-panel.hidden {
+  opacity: 0;
+  transform: translateY(60px);
+  pointer-events: none;
+  max-height: 0;
+  overflow: hidden;
+  margin: 0;
+  gap: 0;
 }
 
 .panel-buttons {
@@ -186,4 +320,235 @@
   font-size: 14px;
   margin: 0;
   font-family: system-ui, sans-serif;
+}
+
+.content-layer.lobby-mode {
+  padding-top: 30px;
+}
+
+/* Old game-logo styles removed - using home-logo now */
+
+.lobby-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 400px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-delay: 0.15s;
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
+  max-height: 0;
+  overflow: hidden;
+}
+
+.lobby-content.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+  max-height: 1000px;
+}
+
+/* Remove old animation keyframe */
+@keyframes lobby-fade-in-unused {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lobby-room-code {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 16px 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.lobby-room-code:hover {
+  transform: scale(1.02);
+}
+
+.lobby-code-value {
+  font-family: 'Courier New', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  color: #3B82F6;
+  display: block;
+}
+
+.lobby-copy-hint {
+  font-size: 11px;
+  color: #9CA3AF;
+  margin-top: 4px;
+  display: block;
+  transition: color 0.2s;
+}
+
+.lobby-copy-hint.copied {
+  color: #10B981;
+}
+
+.lobby-players {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 16px;
+  width: 100%;
+}
+
+.lobby-section-title {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 12px;
+}
+
+.lobby-player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lobby-player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.lobby-player.local {
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(96, 165, 250, 0.15);
+}
+
+.lobby-player.ready {
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.lobby-player-avatar {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  border-radius: 50%;
+  border: 2px solid;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.lobby-player-name {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-weight: 500;
+  color: white;
+  font-size: 14px;
+}
+
+.lobby-ready-badge {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.lobby-ready-badge.ready {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.lobby-settings {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 16px;
+  width: 100%;
+}
+
+.lobby-round-options {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.lobby-round-btn {
+  width: 48px;
+  height: 48px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-radius: 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.lobby-round-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.lobby-round-btn.selected {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.lobby-round-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lobby-ready-button {
+  width: 100%;
+  padding: 16px 32px;
+  font-family: 'Courier New', monospace;
+  font-size: 20px;
+  font-weight: 700;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: white;
+  box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
+}
+
+.lobby-ready-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(34, 197, 94, 0.4);
+}
+
+.lobby-ready-button.is-ready {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+}
+
+.lobby-ready-button.is-ready:hover {
+  box-shadow: 0 8px 30px rgba(239, 68, 68, 0.4);
+}
+
+.lobby-status {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
 }
