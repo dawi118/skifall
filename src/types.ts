@@ -31,11 +31,3 @@ export interface SkierRenderState {
   skis: SkierPartState;
   crashed: boolean;
 }
-
-export interface PlayerRenderData {
-  id: string;
-  lines: Line[];
-  skierState: SkierRenderState;
-  opacity: number;
-  isLocal: boolean;
-}

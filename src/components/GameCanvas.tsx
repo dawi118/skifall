@@ -7,10 +7,11 @@ import { useTimer } from '../hooks/useTimer';
 import { Toolbar } from './Toolbar';
 import { Timer } from './Timer';
 import { RoundComplete } from './RoundComplete';
-import { COLORS, PLAYING_ZOOM, FINISH_ZONE_RADIUS, DEV_MODE } from '../lib/constants';
+import { COLORS, PLAYING_ZOOM, FINISH_ZONE_RADIUS, DEV_MODE, ANIM_SPEED, GHOST_LERP_SPEED, SKIER_BROADCAST_INTERVAL } from '../lib/constants';
 import { DevMenu } from './DevMenu';
 import { drawGrid, drawMarker, drawLines, drawLine, applyCameraTransform, calculateFitBounds } from '../lib/renderer';
 import { drawSkier, drawGhostSkier } from '../lib/skier';
+import { isAnimationDone, animateToward, lerpPositionable } from '../lib/animation';
 import './GameCanvas.css';
 
 import type { Level } from '../lib/level-generator';
@@ -19,48 +20,12 @@ import type { RemoteLine, Player, RemoteSkier } from '../hooks/usePartySocket';
 
 type TransitionPhase = 'idle' | 'skier-out' | 'portals-out' | 'camera-move' | 'portals-in' | 'skier-in' | 'zoom-in';
 
-const ANIM_SPEED = 0.15;
-const SKIER_BROADCAST_INTERVAL = 66; // ~15Hz
-const GHOST_LERP_SPEED = 0.25;
-
-function isAnimationDone(current: number, target: number, threshold = 0.02): boolean {
-  return Math.abs(current - target) < threshold;
-}
-
-function animateToward(
-  current: number,
-  target: number,
-  speed: number
-): { value: number; done: boolean } {
-  const next = current + (target - current) * speed;
-  const done = Math.abs(next - target) < 0.01;
-  return { value: done ? target : next, done };
-}
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-interface BodyPart {
-  x: number;
-  y: number;
-  angle: number;
-}
-
-function lerpBodyPart(current: BodyPart, target: BodyPart, t: number): BodyPart {
-  return {
-    x: lerp(current.x, target.x, t),
-    y: lerp(current.y, target.y, t),
-    angle: lerp(current.angle, target.angle, t),
-  };
-}
-
 function lerpSkierState(current: SkierRenderState, target: SkierRenderState, t: number): SkierRenderState {
   return {
-    head: lerpBodyPart(current.head, target.head, t),
-    upper: lerpBodyPart(current.upper, target.upper, t),
-    lower: lerpBodyPart(current.lower, target.lower, t),
-    skis: lerpBodyPart(current.skis, target.skis, t),
+    head: lerpPositionable(current.head, target.head, t),
+    upper: lerpPositionable(current.upper, target.upper, t),
+    lower: lerpPositionable(current.lower, target.lower, t),
+    skis: lerpPositionable(current.skis, target.skis, t),
     crashed: target.crashed,
   };
 }

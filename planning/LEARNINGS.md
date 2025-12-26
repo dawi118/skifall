@@ -18,7 +18,13 @@
 - **Cleanup on state change**: Ghost skiers removed from interpolation map when player resets (runState='idle') or new level starts.
 
 ### Code Organization
-- **`lib/` for pure functions**: `renderer.ts`, `skier.ts`, `physics.ts` - no React dependencies
+- **`lib/` for pure functions**: `renderer.ts`, `skier.ts`, `physics.ts`, `animation.ts` - no React dependencies
 - **`hooks/` for stateful logic**: `useLocalPlayer`, `useCamera`, `useTimer`, `usePartySocket`
 - **`components/` for UI**: GameCanvas is the main game, others are overlays (Timer, Toolbar, RoundComplete)
+- **`lib/constants.ts`**: All tunables (animation speeds, game durations, colors) centralized here
+
+### React Gotcha: Async setState
+- **Bug pattern**: Trying to return a value set inside a `setState` callback won't work because the callback runs asynchronously
+- **Fix**: Find the value synchronously first, then call `setState` to update, then return the value
+- **Example**: `eraseLine()` in `useDrawing` - find the line to erase before calling `setLines()`
 

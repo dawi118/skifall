@@ -2,9 +2,10 @@
 
 Concise directives for working on this codebase, ordered by frequency of relevance.
 
-## Code Quality (3x)
+## Code Quality (4x)
+- **Extract general utilities to lib/** - animation helpers (`lerp`, `animateToward`) go in `lib/animation.ts`, not inline in components
 - **Remove comments that restate code** - constant names like `SKIER_BROADCAST_INTERVAL` are self-documenting
-- **Extract duplicate patterns into helpers** - e.g., `animateToward()` for animation easing, `lerpBodyPart()` for interpolation
+- **Consolidate constants** - all tunables in `lib/constants.ts` for easy adjustment
 - **Prefer ternary for simple conditional assignment** - cleaner than nested if/else
 
 ## React Patterns (3x)
@@ -15,6 +16,9 @@ Concise directives for working on this codebase, ordered by frequency of relevan
 ## Multiplayer Architecture (2x)
 - **Server owns shared state** (level, timer, lines) - clients are views into that state
 - **Interpolate network positions locally** - store display state separate from target state, lerp each frame
+
+## Project Structure (1x)
+- **Duplicate code between party/ and src/** - `level-generator.ts` exists in both; types like `Player`, `Point`, `Line` defined separately. Future work: create shared/ folder
 
 ## Animation (1x)
 - **Target refs + lerp in game loop** - pattern for smooth animations without React re-renders

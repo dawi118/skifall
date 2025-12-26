@@ -1,5 +1,9 @@
 export const DEV_MODE = true;
 
+export const ANIM_SPEED = 0.15;
+export const GHOST_LERP_SPEED = 0.25;
+export const SKIER_BROADCAST_INTERVAL = 66; // ~15Hz
+
 export const GRAVITY = 1;
 
 export const SKIER_WIDTH = 20;
