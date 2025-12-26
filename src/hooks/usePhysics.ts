@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback } from 'react';
 import {
   createPhysicsEngine,
   addLineToWorld,
@@ -74,11 +74,10 @@ export function usePhysics(): UsePhysicsReturn {
     };
   }, []);
 
-  useEffect(() => {
-    return () => {
-      engineRef.current = null;
-    };
-  }, []);
+  // Note: We intentionally don't clean up engineRef on unmount because
+  // React StrictMode double-mounts components, which would destroy the engine
+  // between the init effect and when play is called. The physics engine is
+  // lightweight and will be garbage collected when the component truly unmounts.
 
   return {
     initPhysics,

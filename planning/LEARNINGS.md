@@ -28,3 +28,9 @@
 - **Fix**: Find the value synchronously first, then call `setState` to update, then return the value
 - **Example**: `eraseLine()` in `useDrawing` - find the line to erase before calling `setLines()`
 
+### React Gotcha: StrictMode and Effect Cleanup
+- **What StrictMode does**: In development, React mounts → runs effects → unmounts → remounts → runs effects again
+- **The trap**: If effect cleanup nulls a ref (`engineRef.current = null`) but the init effect is guarded (`if (alreadyDone) return`), the remount won't re-init
+- **Bug pattern**: Physics engine created in init effect, nulled in cleanup, not recreated on remount because guard prevents re-run
+- **Fix**: Don't null refs in cleanup when the resource will be needed after StrictMode double-mount. Let GC handle it on true unmount.
+

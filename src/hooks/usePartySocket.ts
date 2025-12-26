@@ -3,11 +3,22 @@ import PartySocket from 'partysocket';
 import type { Level } from '../lib/level-generator';
 import type { Line, SkierRenderState, SkierState } from '../types';
 
+export type GamePhase = 'lobby' | 'playing' | 'round-complete' | 'game-over';
+
+export interface RoundResult {
+  finishTime: number | null;
+  score: number;
+}
+
 export interface Player {
   id: string;
   name: string;
   color: string;
   avatar: string;
+  isReady: boolean;
+  isSpectating: boolean;
+  roundResult: RoundResult | null;
+  totalScore: number;
 }
 
 export interface RemoteLine extends Line {
@@ -29,8 +40,12 @@ export function usePartySocket(roomId: string | null) {
   const [isConnected, setIsConnected] = useState(false);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [gamePhase, setGamePhase] = useState<GamePhase>('lobby');
   const [level, setLevel] = useState<Level | null>(null);
   const [roundStartTime, setRoundStartTime] = useState<number | null>(null);
+  const [currentRound, setCurrentRound] = useState(0);
+  const [totalRounds, setTotalRounds] = useState(5);
+  const [roundOptions, setRoundOptions] = useState<number[]>([3, 5, 7, 10]);
   const [remoteLines, setRemoteLines] = useState<RemoteLine[]>([]);
   const [remoteSkiers, setRemoteSkiers] = useState<Map<string, RemoteSkier>>(new Map());
   
@@ -55,8 +70,10 @@ export function usePartySocket(roomId: string | null) {
       setIsConnected(false);
       setPlayerId(null);
       setPlayers([]);
+      setGamePhase('lobby');
       setLevel(null);
       setRoundStartTime(null);
+      setCurrentRound(0);
       setRemoteLines([]);
       setRemoteSkiers(new Map());
     });
@@ -69,13 +86,32 @@ export function usePartySocket(roomId: string | null) {
           case 'welcome':
             setPlayerId(data.playerId);
             setPlayers(data.players);
+            setGamePhase(data.gamePhase);
             if (data.level) setLevel(data.level);
             if (data.roundStartTime) setRoundStartTime(data.roundStartTime);
+            setCurrentRound(data.currentRound ?? 0);
+            setTotalRounds(data.totalRounds ?? 5);
+            if (data.roundOptions) setRoundOptions(data.roundOptions);
             if (data.lines) setRemoteLines(data.lines);
             break;
+            
+          case 'game-state':
+            setGamePhase(data.gamePhase);
+            setPlayers(data.players);
+            if (data.level) setLevel(data.level);
+            if (data.roundStartTime) setRoundStartTime(data.roundStartTime);
+            setCurrentRound(data.currentRound ?? 0);
+            setTotalRounds(data.totalRounds ?? 5);
+            if (data.gamePhase === 'playing') {
+              setRemoteLines([]);
+              setRemoteSkiers(new Map());
+            }
+            break;
+            
           case 'player-joined':
             setPlayers(data.players);
             break;
+            
           case 'player-left':
             setPlayers(data.players);
             if (data.removedLineIds) {
@@ -87,21 +123,34 @@ export function usePartySocket(roomId: string | null) {
               return next;
             });
             break;
+            
+          case 'player-finished':
+            setPlayers(prev => prev.map(p => 
+              p.id === data.playerId 
+                ? { ...p, roundResult: data.roundResult, totalScore: data.totalScore }
+                : p
+            ));
+            break;
+            
           case 'level-update':
             if (data.level) setLevel(data.level);
             if (data.roundStartTime) setRoundStartTime(data.roundStartTime);
             setRemoteLines([]);
             setRemoteSkiers(new Map());
             break;
+            
           case 'line-add':
             setRemoteLines(prev => [...prev, data.line]);
             break;
+            
           case 'line-remove':
             setRemoteLines(prev => prev.filter(l => l.id !== data.lineId));
             break;
+            
           case 'lines-clear':
             setRemoteLines(prev => prev.filter(l => l.playerId !== data.playerId));
             break;
+            
           case 'skier-position':
             setRemoteSkiers(prev => {
               const next = new Map(prev);
@@ -114,6 +163,7 @@ export function usePartySocket(roomId: string | null) {
               return next;
             });
             break;
+            
           default:
             messageHandlerRef.current?.(data);
         }
@@ -133,6 +183,22 @@ export function usePartySocket(roomId: string | null) {
       socketRef.current.send(JSON.stringify(data));
     }
   }, []);
+
+  const setReady = useCallback((isReady: boolean) => {
+    send({ type: 'set-ready', isReady });
+  }, [send]);
+
+  const setTotalRoundsOption = useCallback((totalRounds: number) => {
+    send({ type: 'set-total-rounds', totalRounds });
+  }, [send]);
+
+  const sendPlayerFinished = useCallback((finishTime: number | null) => {
+    send({ type: 'player-finished', finishTime });
+  }, [send]);
+
+  const playAgain = useCallback(() => {
+    send({ type: 'play-again' });
+  }, [send]);
 
   const requestNewLevel = useCallback(() => {
     send({ type: 'request-new-level' });
@@ -164,12 +230,19 @@ export function usePartySocket(roomId: string | null) {
     isConnected, 
     playerId, 
     localPlayer, 
-    players, 
+    players,
+    gamePhase,
     level, 
-    roundStartTime, 
+    roundStartTime,
+    currentRound,
+    totalRounds,
+    roundOptions,
     remoteLines,
     remoteSkiers,
-    send, 
+    setReady,
+    setTotalRoundsOption,
+    sendPlayerFinished,
+    playAgain,
     requestNewLevel,
     sendLineAdd,
     sendLineRemove,

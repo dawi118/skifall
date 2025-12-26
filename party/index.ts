@@ -18,11 +18,25 @@ const PLAYER_AVATARS = [
   "🐯", "🐨", "🐼", "🦝", "🐮", "🐷", "🐸", "🐵",
 ];
 
-interface Player {
+const DEFAULT_TOTAL_ROUNDS = 5;
+const ROUND_OPTIONS = [3, 5, 7, 10];
+
+type GamePhase = 'lobby' | 'playing' | 'round-complete' | 'game-over';
+
+interface RoundResult {
+  finishTime: number | null; // null = DNF
+  score: number;
+}
+
+interface PlayerState {
   id: string;
   name: string;
   color: string;
   avatar: string;
+  isReady: boolean;
+  isSpectating: boolean;
+  roundResult: RoundResult | null;
+  totalScore: number;
 }
 
 interface Point {
@@ -36,38 +50,125 @@ interface Line {
   playerId: string;
 }
 
+function calculateScore(finishTime: number | null): number {
+  if (finishTime === null) return 0;
+  return Math.max(0, 100 - Math.floor(finishTime));
+}
+
 export default class SkiFallServer implements PartyKitServer {
-  players: Map<string, Player> = new Map();
+  players: Map<string, PlayerState> = new Map();
   lines: Map<string, Line> = new Map();
+  
+  gamePhase: GamePhase = 'lobby';
   level: Level | null = null;
   roundStartTime: number | null = null;
+  currentRound: number = 0;
+  totalRounds: number = DEFAULT_TOTAL_ROUNDS;
 
   constructor(readonly room: Party) {}
 
+  getActivePlayers(): PlayerState[] {
+    return Array.from(this.players.values()).filter(p => !p.isSpectating);
+  }
+
+  broadcastGameState() {
+    this.room.broadcast(JSON.stringify({
+      type: 'game-state',
+      gamePhase: this.gamePhase,
+      players: Array.from(this.players.values()),
+      level: this.level,
+      roundStartTime: this.roundStartTime,
+      currentRound: this.currentRound,
+      totalRounds: this.totalRounds,
+    }));
+  }
+
+  checkAllPlayersReady(): boolean {
+    const active = this.getActivePlayers();
+    return active.length > 0 && active.every(p => p.isReady);
+  }
+
+  checkAllPlayersFinished(): boolean {
+    const active = this.getActivePlayers();
+    return active.length > 0 && active.every(p => p.roundResult !== null);
+  }
+
+  startRound() {
+    this.currentRound++;
+    this.level = generateLevel();
+    this.roundStartTime = Date.now();
+    this.lines.clear();
+    
+    for (const player of this.players.values()) {
+      player.isReady = false;
+      player.roundResult = null;
+      if (player.isSpectating) {
+        player.isSpectating = false;
+      }
+    }
+    
+    this.gamePhase = 'playing';
+    this.broadcastGameState();
+  }
+
+  endRound() {
+    for (const player of this.players.values()) {
+      player.isReady = false;
+    }
+    this.gamePhase = 'round-complete';
+    this.broadcastGameState();
+  }
+
+  endGame() {
+    this.gamePhase = 'game-over';
+    this.broadcastGameState();
+  }
+
+  resetToLobby() {
+    this.gamePhase = 'lobby';
+    this.currentRound = 0;
+    this.level = null;
+    this.roundStartTime = null;
+    this.lines.clear();
+    
+    for (const player of this.players.values()) {
+      player.isReady = false;
+      player.isSpectating = false;
+      player.roundResult = null;
+      player.totalScore = 0;
+    }
+    
+    this.broadcastGameState();
+  }
+
   onConnect(conn: Connection) {
     const playerIndex = this.players.size;
-    const player: Player = {
+    const isSpectating = this.gamePhase === 'playing';
+    
+    const player: PlayerState = {
       id: conn.id,
       name: generatePlayerName(),
       color: PLAYER_COLORS[playerIndex % PLAYER_COLORS.length],
       avatar: PLAYER_AVATARS[playerIndex % PLAYER_AVATARS.length],
+      isReady: false,
+      isSpectating,
+      roundResult: null,
+      totalScore: 0,
     };
     
     this.players.set(conn.id, player);
-
-    if (!this.level) {
-      this.level = generateLevel();
-      this.roundStartTime = Date.now();
-    }
     
     conn.send(JSON.stringify({
       type: "welcome",
       playerId: conn.id,
-      player,
+      gamePhase: this.gamePhase,
       players: Array.from(this.players.values()),
       level: this.level,
       roundStartTime: this.roundStartTime,
+      currentRound: this.currentRound,
+      totalRounds: this.totalRounds,
       lines: Array.from(this.lines.values()),
+      roundOptions: ROUND_OPTIONS,
     }));
     
     this.room.broadcast(
@@ -99,6 +200,19 @@ export default class SkiFallServer implements PartyKitServer {
         removedLineIds,
       })
     );
+
+    // Check if game state should change due to player leaving
+    if (this.gamePhase === 'lobby' && this.checkAllPlayersReady()) {
+      this.startRound();
+    } else if (this.gamePhase === 'playing' && this.checkAllPlayersFinished()) {
+      this.endRound();
+    } else if (this.gamePhase === 'round-complete' && this.checkAllPlayersReady()) {
+      if (this.currentRound >= this.totalRounds) {
+        this.endGame();
+      } else {
+        this.startRound();
+      }
+    }
   }
 
   onMessage(message: string | ArrayBuffer | ArrayBufferView, sender: Connection) {
@@ -106,11 +220,69 @@ export default class SkiFallServer implements PartyKitServer {
     
     try {
       const data = JSON.parse(message);
+      const player = this.players.get(sender.id);
+      if (!player) return;
+      
+      if (data.type === 'set-ready') {
+        player.isReady = data.isReady;
+        this.broadcastGameState();
+        
+        if (this.gamePhase === 'lobby' && this.checkAllPlayersReady()) {
+          this.startRound();
+        } else if (this.gamePhase === 'round-complete' && this.checkAllPlayersReady()) {
+          if (this.currentRound >= this.totalRounds) {
+            this.endGame();
+          } else {
+            this.startRound();
+          }
+        }
+        return;
+      }
+      
+      if (data.type === 'set-total-rounds') {
+        if (this.gamePhase === 'lobby' && !player.isReady && ROUND_OPTIONS.includes(data.totalRounds)) {
+          this.totalRounds = data.totalRounds;
+          this.broadcastGameState();
+        }
+        return;
+      }
+      
+      if (data.type === 'player-finished') {
+        if (this.gamePhase === 'playing' && !player.isSpectating && !player.roundResult) {
+          const finishTime = data.finishTime; // null for DNF
+          const score = calculateScore(finishTime);
+          player.roundResult = { finishTime, score };
+          player.totalScore += score;
+          
+          this.room.broadcast(JSON.stringify({
+            type: 'player-finished',
+            playerId: sender.id,
+            roundResult: player.roundResult,
+            totalScore: player.totalScore,
+          }));
+          
+          if (this.checkAllPlayersFinished()) {
+            this.endRound();
+          }
+        }
+        return;
+      }
+      
+      if (data.type === 'play-again') {
+        if (this.gamePhase === 'game-over') {
+          this.resetToLobby();
+        }
+        return;
+      }
       
       if (data.type === 'request-new-level') {
+        // Dev mode: force new level
         this.level = generateLevel();
         this.roundStartTime = Date.now();
         this.lines.clear();
+        for (const p of this.players.values()) {
+          p.roundResult = null;
+        }
         this.room.broadcast(JSON.stringify({
           type: 'level-update',
           level: this.level,
@@ -120,6 +292,7 @@ export default class SkiFallServer implements PartyKitServer {
       }
       
       if (data.type === 'line-add') {
+        if (player.isSpectating) return;
         const line: Line = {
           id: data.line.id,
           points: data.line.points,
@@ -159,6 +332,7 @@ export default class SkiFallServer implements PartyKitServer {
       }
       
       if (data.type === 'skier-position') {
+        if (player.isSpectating) return;
         this.room.broadcast(JSON.stringify({
           type: 'skier-position',
           playerId: sender.id,

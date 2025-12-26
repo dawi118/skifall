@@ -16,7 +16,7 @@ import './GameCanvas.css';
 
 import type { Level } from '../lib/level-generator';
 import type { Line, SkierRenderState, SkierState } from '../types';
-import type { RemoteLine, Player, RemoteSkier } from '../hooks/usePartySocket';
+import type { RemoteLine, Player, RemoteSkier, GamePhase } from '../hooks/usePartySocket';
 
 type TransitionPhase = 'idle' | 'skier-out' | 'portals-out' | 'camera-move' | 'portals-in' | 'skier-in' | 'zoom-in';
 
@@ -36,11 +36,18 @@ interface GameCanvasProps {
   remoteLines?: RemoteLine[];
   remoteSkiers?: Map<string, RemoteSkier>;
   players?: Player[];
+  localPlayer?: Player | null;
   hoveredPlayerId?: string | null;
+  gamePhase?: GamePhase;
+  currentRound?: number;
+  totalRounds?: number;
   onRequestNewLevel?: () => void;
   onLineAdd?: (line: Line) => void;
   onLineRemove?: (lineId: string) => void;
   onSkierPosition?: (state: SkierRenderState, runState: SkierState) => void;
+  onPlayerFinished?: (finishTime: number | null) => void;
+  onSetReady?: (isReady: boolean) => void;
+  onPlayAgain?: () => void;
 }
 
 export function GameCanvas({ 
@@ -49,11 +56,18 @@ export function GameCanvas({
   remoteLines = [],
   remoteSkiers = new Map(),
   players = [],
+  localPlayer,
   hoveredPlayerId,
+  gamePhase = 'playing',
+  currentRound = 1,
+  totalRounds = 5,
   onRequestNewLevel,
   onLineAdd,
   onLineRemove,
   onSkierPosition,
+  onPlayerFinished,
+  onSetReady,
+  onPlayAgain,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,12 +83,9 @@ export function GameCanvas({
   const [skierVisible, setSkierVisible] = useState(true);
   const [portalScale, setPortalScale] = useState(1);
   const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>('idle');
-  const [showRoundComplete, setShowRoundComplete] = useState(false);
 
   const skierScaleTarget = useRef<number | null>(null);
   const portalScaleTarget = useRef<number | null>(null);
-  const roundCompleteTimeoutRef = useRef<number | null>(null);
-  const hasShownRoundComplete = useRef(false);
   const lastSkierBroadcastRef = useRef<number>(0);
   const interpolatedSkiersRef = useRef<Map<string, SkierRenderState>>(new Map());
 
@@ -95,7 +106,6 @@ export function GameCanvas({
     pendingServerLevelRef.current = serverLevel;
     actions.reset(level.start.x, level.start.y);
     timer.stop();
-    setShowRoundComplete(false);
     setTransitionPhase('skier-out');
     skierScaleTarget.current = 0;
     onSkierPosition?.(player.skierRenderState, 'idle');
@@ -116,8 +126,7 @@ export function GameCanvas({
       timer.reset();
       timer.start();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelKey, serverRoundStartTime]);
+  }, [levelKey, serverRoundStartTime, actions, level.start, level.finish, canvasSize, camera, timer]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -420,14 +429,8 @@ export function GameCanvas({
   const handleReset = useCallback(() => {
     if (transitionPhase !== 'idle') return;
 
-    if (roundCompleteTimeoutRef.current) {
-      clearTimeout(roundCompleteTimeoutRef.current);
-      roundCompleteTimeoutRef.current = null;
-    }
-
     actions.reset(level.start.x, level.start.y);
     gameState.resetRound();
-    setShowRoundComplete(false);
     onSkierPosition?.(player.skierRenderState, 'idle');
 
     setSkierVisible(false);
@@ -444,48 +447,46 @@ export function GameCanvas({
   const handleNewLevel = useCallback(() => {
     if (transitionPhase !== 'idle') return;
 
-    if (roundCompleteTimeoutRef.current) {
-      clearTimeout(roundCompleteTimeoutRef.current);
-      roundCompleteTimeoutRef.current = null;
-    }
-
     if (onRequestNewLevel) {
       onRequestNewLevel();
     } else {
       gameState.generateNextLevel();
       actions.reset(level.start.x, level.start.y);
       timer.stop();
-      setShowRoundComplete(false);
       setTransitionPhase('skier-out');
       skierScaleTarget.current = 0;
     }
   }, [actions, level.start, transitionPhase, timer, gameState, onRequestNewLevel]);
 
+  const hasSentFinish = useRef(false);
+
   useEffect(() => {
-    if (player.runState === 'finished' && !hasShownRoundComplete.current) {
-      hasShownRoundComplete.current = true;
+    if (player.runState === 'finished' && !hasSentFinish.current) {
+      hasSentFinish.current = true;
       const finishTime = timer.timeElapsed;
       gameState.finishRound(finishTime);
       timer.stop();
-      roundCompleteTimeoutRef.current = window.setTimeout(() => setShowRoundComplete(true), 500);
+      onPlayerFinished?.(finishTime);
     } else if (player.runState === 'idle') {
-      hasShownRoundComplete.current = false;
+      hasSentFinish.current = false;
     }
-  }, [player.runState, timer, gameState]);
+  }, [player.runState, timer, gameState, onPlayerFinished]);
 
   useEffect(() => {
     const canDNF = player.runState === 'idle' || player.runState === 'moving';
-    if (timer.isExpired && canDNF && !hasShownRoundComplete.current) {
-      hasShownRoundComplete.current = true;
+    if (timer.isExpired && canDNF && !hasSentFinish.current) {
+      hasSentFinish.current = true;
       actions.setRunState('fallen');
       gameState.finishRound(null);
-      roundCompleteTimeoutRef.current = window.setTimeout(() => setShowRoundComplete(true), 500);
+      onPlayerFinished?.(null);
     }
-  }, [timer.isExpired, player.runState, actions, gameState]);
+  }, [timer.isExpired, player.runState, actions, gameState, onPlayerFinished]);
 
   const isTransitioning = transitionPhase !== 'idle';
+  const isSpectating = localPlayer?.isSpectating ?? false;
   const showTimer = timer.isRunning || timer.isExpired || player.runState === 'finished' || player.runState === 'fallen';
-  const canvasClass = `game-canvas tool-${currentTool}${isPanning ? ' panning' : ''}${hoveredLineId ? ' eraser-hover' : ''}`;
+  const showScorecard = gamePhase === 'round-complete' || gamePhase === 'game-over';
+  const canvasClass = `game-canvas tool-${currentTool}${isPanning ? ' panning' : ''}${hoveredLineId ? ' eraser-hover' : ''}${isSpectating ? ' spectating' : ''}`;
 
   return (
     <div className="game-container" ref={containerRef}>
@@ -533,10 +534,15 @@ export function GameCanvas({
         }}
       />
 
-      {showRoundComplete && gameState.roundResult && (
+      {showScorecard && (
         <RoundComplete
-          timeElapsed={gameState.roundResult.finishTime}
-          onNextLevel={handleNewLevel}
+          players={players}
+          localPlayerId={localPlayer?.id ?? null}
+          currentRound={currentRound}
+          totalRounds={totalRounds}
+          isGameOver={gamePhase === 'game-over'}
+          onReady={() => onSetReady?.(true)}
+          onPlayAgain={onPlayAgain}
         />
       )}
     </div>
