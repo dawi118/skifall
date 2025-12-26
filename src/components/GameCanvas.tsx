@@ -462,6 +462,7 @@ export function GameCanvas({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (player.runState === "moving" || transitionPhase !== "idle") return;
+      if (camera.isPinching()) return; // Don't interfere with pinch gesture
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
@@ -492,6 +493,7 @@ export function GameCanvas({
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (player.runState === "moving" || transitionPhase !== "idle") return;
+      if (camera.isPinching()) return; // Don't interfere with pinch gesture
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
@@ -546,13 +548,48 @@ export function GameCanvas({
     handleWheelRef.current = camera.handleWheel;
   }, [camera.handleWheel]);
 
+  const handleTouchStartRef = useRef(camera.handleTouchStart);
+  const handleTouchMoveRef = useRef(camera.handleTouchMove);
+  const handleTouchEndRef = useRef(camera.handleTouchEnd);
+  useEffect(() => {
+    handleTouchStartRef.current = camera.handleTouchStart;
+    handleTouchMoveRef.current = camera.handleTouchMove;
+    handleTouchEndRef.current = camera.handleTouchEnd;
+  }, [camera.handleTouchStart, camera.handleTouchMove, camera.handleTouchEnd]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    
     const onWheel = (e: WheelEvent) => handleWheelRef.current(e);
+    const onTouchStart = (e: TouchEvent) => {
+      if (currentTool === "hand") {
+        handleTouchStartRef.current(e);
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (currentTool === "hand") {
+        handleTouchMoveRef.current(e);
+      }
+    };
+    const onTouchEnd = () => {
+      handleTouchEndRef.current();
+    };
+    
     canvas.addEventListener("wheel", onWheel, { passive: false });
-    return () => canvas.removeEventListener("wheel", onWheel);
-  }, []);
+    canvas.addEventListener("touchstart", onTouchStart, { passive: true });
+    canvas.addEventListener("touchmove", onTouchMove, { passive: false });
+    canvas.addEventListener("touchend", onTouchEnd);
+    canvas.addEventListener("touchcancel", onTouchEnd);
+    
+    return () => {
+      canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("touchstart", onTouchStart);
+      canvas.removeEventListener("touchmove", onTouchMove);
+      canvas.removeEventListener("touchend", onTouchEnd);
+      canvas.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [currentTool]);
 
   const handleMiddleMouseDown = useCallback(
     (e: React.MouseEvent) => {
