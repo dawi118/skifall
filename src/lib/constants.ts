@@ -23,7 +23,8 @@ export const LEVEL_BOUNDS = {
   minSeparation: 1 / 3,
 } as const;
 
-export const ROUND_DURATION_SECONDS = 60;
+export const COUNTDOWN_SECONDS = 3;
+export const ROUND_DURATION_SECONDS = 60 + COUNTDOWN_SECONDS; // 60 seconds + 3 second countdown
 export const BASE_POINTS = 100;
 export const FINISH_ZONE_RADIUS = 50;
 
