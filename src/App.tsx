@@ -17,7 +17,11 @@ function App() {
     players,
     level,
     roundStartTime,
+    remoteLines,
     requestNewLevel,
+    sendLineAdd,
+    sendLineRemove,
+    sendLinesClear,
   } = usePartySocket(roomId);
 
   const handleJoinRoom = (code: string) => {
@@ -34,7 +38,11 @@ function App() {
       <GameCanvas
         serverLevel={level}
         serverRoundStartTime={roundStartTime}
+        remoteLines={remoteLines}
         onRequestNewLevel={requestNewLevel}
+        onLineAdd={sendLineAdd}
+        onLineRemove={sendLineRemove}
+        onLinesClear={sendLinesClear}
       />
 
       {isConnected && (

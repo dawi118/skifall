@@ -14,6 +14,8 @@ import { drawSkier } from '../lib/skier';
 import './GameCanvas.css';
 
 import type { Level } from '../lib/level-generator';
+import type { Line } from '../types';
+import type { RemoteLine } from '../hooks/usePartySocket';
 
 type TransitionPhase = 'idle' | 'skier-out' | 'portals-out' | 'camera-move' | 'portals-in' | 'skier-in' | 'zoom-in';
 
@@ -26,10 +28,22 @@ function isAnimationDone(current: number, target: number): boolean {
 interface GameCanvasProps {
   serverLevel?: Level | null;
   serverRoundStartTime?: number | null;
+  remoteLines?: RemoteLine[];
   onRequestNewLevel?: () => void;
+  onLineAdd?: (line: Line) => void;
+  onLineRemove?: (lineId: string) => void;
+  onLinesClear?: () => void;
 }
 
-export function GameCanvas({ serverLevel, serverRoundStartTime, onRequestNewLevel }: GameCanvasProps) {
+export function GameCanvas({ 
+  serverLevel, 
+  serverRoundStartTime, 
+  remoteLines = [],
+  onRequestNewLevel,
+  onLineAdd,
+  onLineRemove,
+  onLinesClear,
+}: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | undefined>(undefined);
@@ -176,6 +190,13 @@ export function GameCanvas({ serverLevel, serverRoundStartTime, onRequestNewLeve
     drawGrid(ctx, camera.camera, width, height);
     drawMarker(ctx, level.start, 'START', COLORS.startZone, portalScale);
     drawMarker(ctx, level.finish, 'FINISH', COLORS.finishZone, portalScale);
+    
+    // Draw remote players' lines at 20% opacity
+    if (remoteLines.length > 0) {
+      drawLines(ctx, remoteLines, null, 0.2 * portalScale);
+    }
+    
+    // Draw local player's lines
     drawLines(ctx, player.lines, hoveredLineId, portalScale);
 
     if (player.currentStroke.length > 0) {
@@ -187,7 +208,7 @@ export function GameCanvas({ serverLevel, serverRoundStartTime, onRequestNewLeve
     }
 
     ctx.restore();
-  }, [canvasSize, camera.camera, level, player.lines, player.currentStroke, player.skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale]);
+  }, [canvasSize, camera.camera, level, player.lines, player.currentStroke, player.skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale, remoteLines]);
 
   useEffect(() => {
     const loop = (time: number) => {
@@ -258,10 +279,13 @@ export function GameCanvas({ serverLevel, serverRoundStartTime, onRequestNewLeve
         actions.startDrawing(camera.screenToWorld(e.clientX, e.clientY, rect));
       } else if (currentTool === 'eraser') {
         const point = camera.screenToWorld(e.clientX, e.clientY, rect);
-        actions.eraseLine(point);
+        const erasedId = actions.eraseLine(point);
+        if (erasedId) {
+          onLineRemove?.(erasedId);
+        }
       }
     },
-    [player.runState, transitionPhase, currentTool, camera, actions]
+    [player.runState, transitionPhase, currentTool, camera, actions, onLineRemove]
   );
 
   const handlePointerMove = useCallback(
@@ -286,11 +310,12 @@ export function GameCanvas({ serverLevel, serverRoundStartTime, onRequestNewLeve
           const erasedId = actions.eraseLine(point);
           if (erasedId) {
             setHoveredLineId(null);
+            onLineRemove?.(erasedId);
           }
         }
       }
     },
-    [player.runState, player.isDrawing, transitionPhase, currentTool, camera, actions]
+    [player.runState, player.isDrawing, transitionPhase, currentTool, camera, actions, onLineRemove]
   );
 
   const handlePointerUp = useCallback(() => {
@@ -298,9 +323,12 @@ export function GameCanvas({ serverLevel, serverRoundStartTime, onRequestNewLeve
       camera.handlePanEnd();
       setIsPanning(false);
     } else if (currentTool === 'pencil') {
-      actions.endDrawing();
+      const newLine = actions.endDrawing();
+      if (newLine && onLineAdd) {
+        onLineAdd(newLine);
+      }
     }
-  }, [currentTool, camera, actions]);
+  }, [currentTool, camera, actions, onLineAdd]);
 
   const handleWheelRef = useRef(camera.handleWheel);
   useEffect(() => {
@@ -395,6 +423,7 @@ export function GameCanvas({ serverLevel, serverRoundStartTime, onRequestNewLeve
     setShowRoundComplete(false);
     actions.reset(level.start.x, level.start.y);
     actions.clearLines();
+    onLinesClear?.();
     gameState.resetRound();
     timer.reset();
     timer.start();
@@ -409,7 +438,7 @@ export function GameCanvas({ serverLevel, serverRoundStartTime, onRequestNewLeve
       setSkierVisible(true);
       skierScaleTarget.current = 1;
     }, 300);
-  }, [actions, camera, level, timer, canvasSize, gameState]);
+  }, [actions, camera, level, timer, canvasSize, gameState, onLinesClear]);
 
   useEffect(() => {
     if (player.runState === 'finished' && !hasShownRoundComplete.current) {
@@ -418,8 +447,6 @@ export function GameCanvas({ serverLevel, serverRoundStartTime, onRequestNewLeve
       gameState.finishRound(finishTime);
       timer.stop();
       roundCompleteTimeoutRef.current = window.setTimeout(() => setShowRoundComplete(true), 500);
-    } else if (player.runState === 'fallen' && !hasShownRoundComplete.current) {
-      timer.stop();
     } else if (player.runState === 'idle') {
       hasShownRoundComplete.current = false;
     }

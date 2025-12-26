@@ -17,7 +17,7 @@ interface UseLocalPlayerActions {
   initAtSpawn: (spawnX: number, spawnY: number) => void;
   startDrawing: (point: Point) => void;
   continueDrawing: (point: Point) => void;
-  endDrawing: () => void;
+  endDrawing: () => Line | null;
   eraseLine: (point: Point) => string | null;
   getLineAtPoint: (point: Point) => string | null;
   clearLines: () => void;
@@ -68,11 +68,12 @@ export function useLocalPlayer(): UseLocalPlayerReturn {
     setRunState('idle');
   }, [physics]);
 
-  const endDrawing = useCallback(() => {
+  const endDrawing = useCallback((): Line | null => {
     const newLine = drawing.endDrawing();
     if (newLine) {
       physics.addLine(newLine);
     }
+    return newLine;
   }, [drawing, physics]);
 
   const eraseLine = useCallback((point: Point): string | null => {

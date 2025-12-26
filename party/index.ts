@@ -18,8 +18,20 @@ interface Player {
   avatar: string;
 }
 
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface Line {
+  id: string;
+  points: Point[];
+  playerId: string;
+}
+
 export default class SkiFallServer implements PartyKitServer {
   players: Map<string, Player> = new Map();
+  lines: Map<string, Line> = new Map();
   level: Level | null = null;
   roundStartTime: number | null = null;
 
@@ -48,6 +60,7 @@ export default class SkiFallServer implements PartyKitServer {
       players: Array.from(this.players.values()),
       level: this.level,
       roundStartTime: this.roundStartTime,
+      lines: Array.from(this.lines.values()),
     }));
     
     this.room.broadcast(
@@ -63,11 +76,21 @@ export default class SkiFallServer implements PartyKitServer {
   onClose(conn: Connection) {
     this.players.delete(conn.id);
     
+    // Remove all lines from this player
+    const removedLineIds: string[] = [];
+    for (const [lineId, line] of this.lines) {
+      if (line.playerId === conn.id) {
+        this.lines.delete(lineId);
+        removedLineIds.push(lineId);
+      }
+    }
+    
     this.room.broadcast(
       JSON.stringify({
         type: "player-left",
         playerId: conn.id,
         players: Array.from(this.players.values()),
+        removedLineIds,
       })
     );
   }
@@ -81,11 +104,52 @@ export default class SkiFallServer implements PartyKitServer {
       if (data.type === 'request-new-level') {
         this.level = generateLevel();
         this.roundStartTime = Date.now();
+        this.lines.clear();
         this.room.broadcast(JSON.stringify({
           type: 'level-update',
           level: this.level,
           roundStartTime: this.roundStartTime,
         }));
+        return;
+      }
+      
+      if (data.type === 'line-add') {
+        const line: Line = {
+          id: data.line.id,
+          points: data.line.points,
+          playerId: sender.id,
+        };
+        this.lines.set(line.id, line);
+        this.room.broadcast(JSON.stringify({
+          type: 'line-add',
+          line,
+        }), [sender.id]);
+        return;
+      }
+      
+      if (data.type === 'line-remove') {
+        const existingLine = this.lines.get(data.lineId);
+        if (existingLine && existingLine.playerId === sender.id) {
+          this.lines.delete(data.lineId);
+          this.room.broadcast(JSON.stringify({
+            type: 'line-remove',
+            lineId: data.lineId,
+          }), [sender.id]);
+        }
+        return;
+      }
+      
+      if (data.type === 'lines-clear') {
+        // Remove all lines for this player
+        for (const [lineId, line] of this.lines) {
+          if (line.playerId === sender.id) {
+            this.lines.delete(lineId);
+          }
+        }
+        this.room.broadcast(JSON.stringify({
+          type: 'lines-clear',
+          playerId: sender.id,
+        }), [sender.id]);
         return;
       }
       

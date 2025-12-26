@@ -1,12 +1,17 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import PartySocket from 'partysocket';
 import type { Level } from '../lib/level-generator';
+import type { Line } from '../types';
 
 export interface Player {
   id: string;
   name: string;
   color: string;
   avatar: string;
+}
+
+export interface RemoteLine extends Line {
+  playerId: string;
 }
 
 const PARTYKIT_HOST = import.meta.env.DEV 
@@ -19,6 +24,7 @@ export function usePartySocket(roomId: string | null) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [level, setLevel] = useState<Level | null>(null);
   const [roundStartTime, setRoundStartTime] = useState<number | null>(null);
+  const [remoteLines, setRemoteLines] = useState<RemoteLine[]>([]);
   
   const socketRef = useRef<PartySocket | null>(null);
   const messageHandlerRef = useRef<((data: unknown) => void) | null>(null);
@@ -43,6 +49,7 @@ export function usePartySocket(roomId: string | null) {
       setPlayers([]);
       setLevel(null);
       setRoundStartTime(null);
+      setRemoteLines([]);
     });
 
     socket.addEventListener('message', (event) => {
@@ -55,14 +62,30 @@ export function usePartySocket(roomId: string | null) {
             setPlayers(data.players);
             if (data.level) setLevel(data.level);
             if (data.roundStartTime) setRoundStartTime(data.roundStartTime);
+            if (data.lines) setRemoteLines(data.lines);
             break;
           case 'player-joined':
+            setPlayers(data.players);
+            break;
           case 'player-left':
             setPlayers(data.players);
+            if (data.removedLineIds) {
+              setRemoteLines(prev => prev.filter(l => !data.removedLineIds.includes(l.id)));
+            }
             break;
           case 'level-update':
             if (data.level) setLevel(data.level);
             if (data.roundStartTime) setRoundStartTime(data.roundStartTime);
+            setRemoteLines([]);
+            break;
+          case 'line-add':
+            setRemoteLines(prev => [...prev, data.line]);
+            break;
+          case 'line-remove':
+            setRemoteLines(prev => prev.filter(l => l.id !== data.lineId));
+            break;
+          case 'lines-clear':
+            setRemoteLines(prev => prev.filter(l => l.playerId !== data.playerId));
             break;
           default:
             messageHandlerRef.current?.(data);
@@ -88,11 +111,37 @@ export function usePartySocket(roomId: string | null) {
     send({ type: 'request-new-level' });
   }, [send]);
 
+  const sendLineAdd = useCallback((line: Line) => {
+    send({ type: 'line-add', line });
+  }, [send]);
+
+  const sendLineRemove = useCallback((lineId: string) => {
+    send({ type: 'line-remove', lineId });
+  }, [send]);
+
+  const sendLinesClear = useCallback(() => {
+    send({ type: 'lines-clear' });
+  }, [send]);
+
   const onMessage = useCallback((handler: (data: unknown) => void) => {
     messageHandlerRef.current = handler;
   }, []);
 
   const localPlayer = players.find(p => p.id === playerId) ?? null;
 
-  return { isConnected, playerId, localPlayer, players, level, roundStartTime, send, requestNewLevel, onMessage };
+  return { 
+    isConnected, 
+    playerId, 
+    localPlayer, 
+    players, 
+    level, 
+    roundStartTime, 
+    remoteLines,
+    send, 
+    requestNewLevel,
+    sendLineAdd,
+    sendLineRemove,
+    sendLinesClear,
+    onMessage,
+  };
 }
