@@ -6,6 +6,7 @@ import { useDrawing } from '../hooks/useDrawing';
 import { useTimer } from '../hooks/useTimer';
 import { Toolbar } from './Toolbar';
 import { Timer } from './Timer';
+import { RoundComplete } from './RoundComplete';
 import { COLORS, PLAYING_ZOOM, FINISH_ZONE_RADIUS } from '../lib/constants';
 import { drawGrid, drawMarker, drawLines, drawLine, applyCameraTransform, calculateFitBounds } from '../lib/renderer';
 import { drawSkier, calculateInitialPositions, type SkierRenderState } from '../lib/skier';
@@ -39,6 +40,8 @@ export function GameCanvas() {
   const [skierVisible, setSkierVisible] = useState(true);
   const [portalScale, setPortalScale] = useState(1);
   const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>('idle');
+  const [finishTime, setFinishTime] = useState<number | null>(null);
+  const [showRoundComplete, setShowRoundComplete] = useState(false);
 
   const skierScaleTarget = useRef<number | null>(null);
   const portalScaleTarget = useRef<number | null>(null);
@@ -57,17 +60,28 @@ export function GameCanvas() {
   useEffect(() => {
     physics.initPhysics(level.start.x, level.start.y);
     setSkierRenderState(calculateInitialPositions(level.start.x, level.start.y));
+    
+    const bounds = calculateFitBounds(level.start, level.finish, canvasSize.width, canvasSize.height);
+    camera.setCamera({ x: bounds.centerX, y: bounds.centerY, zoom: bounds.zoom });
+    
     timer.reset();
     timer.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [levelKey]);
 
   useEffect(() => {
-    const physicsLineIds = physics.getLineIds();
+    const physicsLineIds = new Set(physics.getLineIds());
     const drawingLineIds = new Set(drawing.lines.map((l) => l.id));
+    
     for (const id of physicsLineIds) {
       if (!drawingLineIds.has(id)) {
         physics.removeLine(id);
+      }
+    }
+    
+    for (const line of drawing.lines) {
+      if (!physicsLineIds.has(line.id)) {
+        physics.addLine(line);
       }
     }
   }, [drawing.lines, physics]);
@@ -331,8 +345,15 @@ export function GameCanvas() {
   const handleReset = useCallback(() => {
     if (transitionPhase !== 'idle') return;
 
+    if (roundCompleteTimeoutRef.current) {
+      clearTimeout(roundCompleteTimeoutRef.current);
+      roundCompleteTimeoutRef.current = null;
+    }
+
     setSkierState('idle');
     physics.reset();
+    setShowRoundComplete(false);
+    setFinishTime(null);
 
     setSkierVisible(false);
     camera.animateToZoom(1);
@@ -349,23 +370,70 @@ export function GameCanvas() {
   const handleNewLevel = useCallback(() => {
     if (transitionPhase !== 'idle') return;
 
+    if (roundCompleteTimeoutRef.current) {
+      clearTimeout(roundCompleteTimeoutRef.current);
+      roundCompleteTimeoutRef.current = null;
+    }
+
     pendingLevelRef.current = generateLevel();
     setSkierState('idle');
     physics.reset();
     timer.stop();
+    setShowRoundComplete(false);
+    setFinishTime(null);
     setTransitionPhase('skier-out');
     skierScaleTarget.current = 0;
   }, [physics, transitionPhase, timer]);
 
+  const handleRetry = useCallback(() => {
+    if (roundCompleteTimeoutRef.current) {
+      clearTimeout(roundCompleteTimeoutRef.current);
+      roundCompleteTimeoutRef.current = null;
+    }
+
+    setShowRoundComplete(false);
+    setFinishTime(null);
+    setSkierState('idle');
+    physics.reset();
+    drawing.clearLines();
+    timer.reset();
+    timer.start();
+
+    const bounds = calculateFitBounds(level.start, level.finish, canvasSize.width, canvasSize.height);
+    
+    setSkierVisible(false);
+    camera.setCamera({ x: bounds.centerX, y: bounds.centerY, zoom: bounds.zoom });
+    setSkierRenderState(calculateInitialPositions(level.start.x, level.start.y));
+
+    setTimeout(() => {
+      setSkierScale(0);
+      setSkierVisible(true);
+      skierScaleTarget.current = 1;
+    }, 300);
+  }, [physics, camera, level, drawing, timer, canvasSize]);
+
+  const roundCompleteTimeoutRef = useRef<number | null>(null);
+  const hasShownRoundComplete = useRef(false);
+
   useEffect(() => {
-    if (skierState === 'finished' || skierState === 'fallen') {
+    if (skierState === 'finished' && !hasShownRoundComplete.current) {
+      hasShownRoundComplete.current = true;
+      setFinishTime(timer.timeElapsed);
       timer.stop();
+      roundCompleteTimeoutRef.current = window.setTimeout(() => setShowRoundComplete(true), 500);
+    } else if (skierState === 'fallen' && !hasShownRoundComplete.current) {
+      timer.stop();
+    } else if (skierState === 'idle') {
+      hasShownRoundComplete.current = false;
     }
   }, [skierState, timer]);
 
   useEffect(() => {
-    if (timer.isExpired && skierState === 'moving') {
+    if (timer.isExpired && skierState === 'moving' && !hasShownRoundComplete.current) {
+      hasShownRoundComplete.current = true;
       setSkierState('fallen');
+      setFinishTime(null);
+      roundCompleteTimeoutRef.current = window.setTimeout(() => setShowRoundComplete(true), 500);
     }
   }, [timer.isExpired, skierState]);
 
@@ -423,6 +491,14 @@ export function GameCanvas() {
           setHoveredLineId(null);
         }}
       />
+
+      {showRoundComplete && (
+        <RoundComplete
+          timeElapsed={finishTime}
+          onRetry={handleRetry}
+          onNewLevel={handleNewLevel}
+        />
+      )}
     </div>
   );
 }

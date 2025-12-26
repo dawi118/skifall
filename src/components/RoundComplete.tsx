@@ -1,56 +1,48 @@
-import type { RoundResult } from '../hooks/useGameState';
-import { formatTime } from '../lib/scoring';
+import { calculateScore, formatTime } from '../lib/scoring';
 import './RoundComplete.css';
 
 interface RoundCompleteProps {
-  result: RoundResult;
-  onNextLevel: () => void;
+  timeElapsed: number | null;
   onRetry: () => void;
+  onNewLevel: () => void;
 }
 
-export function RoundComplete({ result, onNextLevel, onRetry }: RoundCompleteProps) {
-  const isDNF = result.finishTime === null;
-  
+export function RoundComplete({ timeElapsed, onRetry, onNewLevel }: RoundCompleteProps) {
+  const isDNF = timeElapsed === null;
+  const score = calculateScore(timeElapsed);
+
   return (
     <div className="round-complete-overlay">
       <div className="round-complete-card">
-        <div className="round-complete-header">
-          {isDNF ? (
-            <>
-              <span className="result-emoji">😵</span>
-              <h2>Time's Up!</h2>
-            </>
-          ) : (
-            <>
-              <span className="result-emoji">🎿</span>
-              <h2>Finish!</h2>
-            </>
-          )}
+        {isDNF ? (
+          <>
+            <div className="round-complete-icon">💥</div>
+            <h2 className="round-complete-title dnf">DNF</h2>
+            <p className="round-complete-subtitle">Did Not Finish</p>
+          </>
+        ) : (
+          <>
+            <div className="round-complete-icon">🏁</div>
+            <h2 className="round-complete-title">Finished!</h2>
+            <p className="round-complete-time">{formatTime(timeElapsed)}</p>
+          </>
+        )}
+
+        <div className="round-complete-score">
+          <span className="score-label">Score</span>
+          <span className="score-value">{score}</span>
+          <span className="score-max">/ 100</span>
         </div>
-        
-        <div className="round-complete-stats">
-          <div className="stat">
-            <span className="stat-label">Time</span>
-            <span className="stat-value">
-              {isDNF ? 'DNF' : formatTime(result.finishTime!)}
-            </span>
-          </div>
-          <div className="stat score">
-            <span className="stat-label">Score</span>
-            <span className="stat-value">{result.score} pts</span>
-          </div>
-        </div>
-        
+
         <div className="round-complete-actions">
-          <button className="btn-retry" onClick={onRetry}>
-            ↺ Try Again
+          <button className="retry-btn" onClick={onRetry}>
+            ↺ Retry
           </button>
-          <button className="btn-next" onClick={onNextLevel}>
-            Next Level →
+          <button className="new-level-btn" onClick={onNewLevel}>
+            New Level →
           </button>
         </div>
       </div>
     </div>
   );
 }
-
