@@ -47,17 +47,14 @@ export function useDrawing(): UseDrawingReturn {
   }, [isDrawing, currentStroke]);
 
   const eraseLine = useCallback((point: Point): string | null => {
-    let erasedId: string | null = null;
-    setLines((prev) => {
-      const target = prev.find((line) => isPointNearLine(point, line));
-      if (target) {
-        erasedId = target.id;
-        return prev.filter((line) => line.id !== target.id);
-      }
-      return prev;
-    });
-    return erasedId;
-  }, []);
+    // Find the line synchronously first, then update state
+    const target = lines.find((line) => isPointNearLine(point, line));
+    if (target) {
+      setLines((prev) => prev.filter((line) => line.id !== target.id));
+      return target.id;
+    }
+    return null;
+  }, [lines]);
 
   const getLineAtPoint = useCallback(
     (point: Point): string | null => {
