@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { generateRoomCode, isValidRoomCode } from '../lib/room-codes';
 import { audioManager } from '../lib/audio';
 import { MenuButton } from './MenuButton';
+import { SkierAvatar } from './SkierAvatar';
 import type { Player } from '../hooks/usePartySocket';
 import backgroundGif from '../assets/images/homepage chalet advanced.gif';
 import logoImage from '../assets/images/skifall_logo_transparent.png';
@@ -148,20 +149,21 @@ export function HomeScreen({
           <div className="lobby-players">
             <div className="lobby-section-title">Players ({players.length})</div>
             <div className="lobby-player-list">
-              {players.map(player => (
-                <div 
-                  key={player.id} 
-                  className={`lobby-player ${player.isReady ? 'ready' : ''} ${player.id === localPlayerId ? 'local' : ''}`}
-                >
-                  <span className="lobby-player-avatar" style={{ borderColor: player.color }}>
-                    {player.avatar}
-                  </span>
-                  <span className="lobby-player-name">{player.name}</span>
-                  <span className={`lobby-ready-badge ${player.isReady ? 'ready' : ''}`}>
-                    {player.isReady ? '✓' : '...'}
-                  </span>
-                </div>
-              ))}
+              {players.map(player => {
+                const isLocal = player.id === localPlayerId;
+                return (
+                  <div 
+                    key={player.id} 
+                    className={`lobby-player ${player.isReady ? 'ready' : ''} ${isLocal ? 'local' : ''}`}
+                  >
+                    <SkierAvatar character={player.character} size={40} />
+                    <span className="lobby-player-name">{isLocal ? 'You' : player.name}</span>
+                    <span className={`lobby-ready-badge ${player.isReady ? 'ready' : ''}`}>
+                      {player.isReady ? '✓' : '...'}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

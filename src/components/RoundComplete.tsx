@@ -1,4 +1,5 @@
 import { formatTime } from '../lib/scoring';
+import { SkierAvatar } from './SkierAvatar';
 import type { Player } from '../hooks/usePartySocket';
 import './RoundComplete.css';
 
@@ -71,10 +72,8 @@ export function RoundComplete({
                   {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
                 </span>
                 <span className="lb-player">
-                  <span className="player-avatar-small" style={{ borderColor: player.color }}>
-                    {player.avatar}
-                  </span>
-                  <span className="player-name-text">{player.name}</span>
+                  <SkierAvatar character={player.character} size={32} />
+                  <span className="player-name-text">{isLocal ? 'You' : player.name}</span>
                   {player.isReady && <span className="ready-check">✓</span>}
                 </span>
                 <span className="lb-round">

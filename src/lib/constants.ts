@@ -1,4 +1,4 @@
-export const DEV_MODE = true;
+export const DEV_MODE = false;
 
 export const ANIM_SPEED = 0.15;
 export const GHOST_LERP_SPEED = 0.25;

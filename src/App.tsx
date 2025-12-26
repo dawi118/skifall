@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { HomeScreen } from "./components/HomeScreen";
 import { GameCanvas } from "./components/GameCanvas";
 import { PlayerAvatars } from "./components/PlayerAvatars";
+import { AudioButton } from "./components/AudioButton";
 import { usePartySocket } from "./hooks/usePartySocket";
 import { preloadAllSprites } from "./lib/sprites";
 import { audioManager } from "./lib/audio";
@@ -72,11 +73,7 @@ function App() {
     setRoomId(code);
   };
 
-  const muteButton = (
-    <button className="mute-btn" onClick={handleToggleMute} title={isMuted ? "Unmute" : "Mute"}>
-      {isMuted ? "🔇" : "🔊"}
-    </button>
-  );
+  const audioButton = <AudioButton isMuted={isMuted} onClick={handleToggleMute} />;
 
   // Show lobby in home screen when:
   // - We have a roomId AND we're connected AND in lobby phase
@@ -99,7 +96,7 @@ function App() {
           onSetReady={setReady}
           onSetTotalRounds={setTotalRoundsOption}
         />
-        {muteButton}
+        {audioButton}
       </>
     );
   }
@@ -133,7 +130,7 @@ function App() {
           onHoverPlayer={setHoveredPlayerId}
         />
       )}
-      {muteButton}
+      {audioButton}
     </>
   );
 }

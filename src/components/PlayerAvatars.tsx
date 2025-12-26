@@ -1,4 +1,5 @@
 import type { Player } from '../hooks/usePartySocket';
+import { SkierAvatar } from './SkierAvatar';
 import './PlayerAvatars.css';
 
 interface PlayerAvatarsProps {
@@ -15,16 +16,14 @@ export function PlayerAvatars({ players, localPlayerId, onHoverPlayer }: PlayerA
         return (
           <div
             key={player.id}
-            className={`player-avatar ${isLocal ? 'local' : ''}`}
-            style={{ borderColor: player.color }}
+            className={`player-avatar-wrapper ${isLocal ? 'local' : ''}`}
             onMouseEnter={() => !isLocal && onHoverPlayer?.(player.id)}
             onMouseLeave={() => !isLocal && onHoverPlayer?.(null)}
           >
-            <span className="avatar-emoji">{player.avatar}</span>
+            <SkierAvatar character={player.character} size={64} />
           </div>
         );
       })}
     </div>
   );
 }
-

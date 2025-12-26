@@ -114,18 +114,6 @@
   gap: 8px;
 }
 
-.player-avatar-small {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.875rem;
-  border-radius: 50%;
-  border: 2px solid;
-  background: rgba(0, 0, 0, 0.2);
-  flex-shrink: 0;
-}
 
 .player-name-text {
   font-weight: 500;

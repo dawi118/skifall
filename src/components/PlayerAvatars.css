@@ -7,32 +7,17 @@
   z-index: 999;
 }
 
-.player-avatar {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: white;
-  border: 3px solid;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+.player-avatar-wrapper {
   cursor: default;
-  opacity: 0.6;
-  transition: opacity 0.15s ease;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-.player-avatar:hover {
+.player-avatar-wrapper:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.player-avatar-wrapper.local {
   opacity: 1;
 }
-
-.player-avatar.local {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
-}
-
-.avatar-emoji {
-  font-size: 24px;
-  line-height: 1;
-}
-

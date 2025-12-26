@@ -1,0 +1,31 @@
+.tool-btn {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+  
+  /* Unselected state: grayscale + semi-opacity */
+  filter: grayscale(100%);
+  opacity: 0.2;
+}
+
+/* Hover on unselected: semi-opacity but no grayscale */
+.tool-btn:hover {
+  filter: grayscale(0%);
+  opacity: 0.5;
+}
+
+/* Selected state: full opacity, no grayscale */
+.tool-btn.selected {
+  filter: grayscale(0%);
+  opacity: 1;
+}
+
+/* Keep selected state even when hovering */
+.tool-btn.selected:hover {
+  filter: grayscale(0%);
+  opacity: 1;
+}
+

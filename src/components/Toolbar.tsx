@@ -1,4 +1,8 @@
 import type { Tool, SkierState } from '../types';
+import { ToolButton } from './ToolButton';
+import panIcon from '../assets/images/pan.png';
+import pencilIcon from '../assets/images/pencil.png';
+import eraserIcon from '../assets/images/eraser.png';
 import './Toolbar.css';
 
 interface ToolbarProps {
@@ -17,32 +21,26 @@ export function Toolbar({
   const isDisabled = skierState === 'moving' || disabled;
 
   return (
-    <div className="toolbar">
+    <div className={`toolbar ${isDisabled ? 'disabled' : ''}`}>
       <div className="toolbar-section tools">
-        <button
-          className={`tool-btn ${currentTool === 'hand' ? 'active' : ''}`}
-          onClick={() => onToolChange('hand')}
-          disabled={isDisabled}
-          data-tooltip="Pan"
-        >
-          ✋
-        </button>
-        <button
-          className={`tool-btn ${currentTool === 'pencil' ? 'active' : ''}`}
-          onClick={() => onToolChange('pencil')}
-          disabled={isDisabled}
-          data-tooltip="Draw"
-        >
-          ✏️
-        </button>
-        <button
-          className={`tool-btn ${currentTool === 'eraser' ? 'active' : ''}`}
-          onClick={() => onToolChange('eraser')}
-          disabled={isDisabled}
-          data-tooltip="Erase"
-        >
-          🧽
-        </button>
+        <ToolButton
+          src={panIcon}
+          alt="Pan"
+          isSelected={currentTool === 'hand'}
+          onClick={() => !isDisabled && onToolChange('hand')}
+        />
+        <ToolButton
+          src={pencilIcon}
+          alt="Draw"
+          isSelected={currentTool === 'pencil'}
+          onClick={() => !isDisabled && onToolChange('pencil')}
+        />
+        <ToolButton
+          src={eraserIcon}
+          alt="Erase"
+          isSelected={currentTool === 'eraser'}
+          onClick={() => !isDisabled && onToolChange('eraser')}
+        />
       </div>
     </div>
   );

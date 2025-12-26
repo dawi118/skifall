@@ -3,14 +3,10 @@ import { generatePlayerName } from "./player-names";
 import { generateLevel, type Level } from "./level-generator";
 
 const PLAYER_COLORS = [
-  "#E11D48", // rose
-  "#F59E0B", // amber
-  "#10B981", // emerald
-  "#06B6D4", // cyan
-  "#3B82F6", // blue
-  "#8B5CF6", // violet
-  "#EC4899", // pink
-  "#84CC16", // lime
+  "#E11D48", // red
+  "#2563EB", // blue
+  "#16A34A", // green
+  "#F59E0B", // orange
 ];
 
 const PLAYER_AVATARS = [

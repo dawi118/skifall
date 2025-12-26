@@ -393,18 +393,6 @@
   border-color: rgba(34, 197, 94, 0.4);
 }
 
-.lobby-player-avatar {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.1rem;
-  border-radius: 50%;
-  border: 2px solid;
-  background: rgba(0, 0, 0, 0.3);
-}
-
 .lobby-player-name {
   flex: 1;
   font-family: 'Courier New', monospace;
