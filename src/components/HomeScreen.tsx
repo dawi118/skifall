@@ -1,27 +1,11 @@
 import { useState } from 'react';
 import { generateRoomCode, isValidRoomCode } from '../lib/room-codes';
+import backgroundGif from '../assets/images/homepage chalet advanced.gif';
+import logoImage from '../assets/images/skifall_logo_transparent.png';
 import './HomeScreen.css';
 
 interface HomeScreenProps {
   onJoinRoom: (roomId: string) => void;
-}
-
-interface Snowflake {
-  id: number;
-  x: number;
-  size: number;
-  duration: number;
-  delay: number;
-}
-
-function createSnowflakes(): Snowflake[] {
-  return Array.from({ length: 50 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    size: Math.random() * 4 + 2,
-    duration: Math.random() * 3 + 4,
-    delay: Math.random() * 5,
-  }));
 }
 
 export function HomeScreen({ onJoinRoom }: HomeScreenProps) {
@@ -30,7 +14,6 @@ export function HomeScreen({ onJoinRoom }: HomeScreenProps) {
   const [generatedCode, setGeneratedCode] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
-  const [snowflakes] = useState<Snowflake[]>(createSnowflakes);
 
   const handleCreate = () => {
     const code = generateRoomCode();
@@ -66,26 +49,12 @@ export function HomeScreen({ onJoinRoom }: HomeScreenProps) {
 
   return (
     <div className="home-screen">
-      <div className="snow-container">
-        {snowflakes.map((flake) => (
-          <div
-            key={flake.id}
-            className="snowflake"
-            style={{
-              left: `${flake.x}%`,
-              width: flake.size,
-              height: flake.size,
-              animationDuration: `${flake.duration}s`,
-              animationDelay: `${flake.delay}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      <h1 className="game-title">
-        <span className="title-ski">SKI</span>
-        <span className="title-fall">FALL</span>
-      </h1>
+      <div 
+        className="background-layer"
+        style={{ backgroundImage: `url(${backgroundGif})` }}
+      />
+      <div className="content-layer">
+        <img src={logoImage} alt="SKI FALL" className="game-logo" />
 
       {mode === 'home' && (
         <div className="floating-buttons">
@@ -132,6 +101,7 @@ export function HomeScreen({ onJoinRoom }: HomeScreenProps) {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
