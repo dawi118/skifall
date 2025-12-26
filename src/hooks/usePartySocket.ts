@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import PartySocket from 'partysocket';
+import type { Level } from '../lib/level-generator';
 
 export interface Player {
   id: string;
@@ -15,6 +16,7 @@ export function usePartySocket(roomId: string | null) {
   const [isConnected, setIsConnected] = useState(false);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [level, setLevel] = useState<Level | null>(null);
   
   const socketRef = useRef<PartySocket | null>(null);
   const messageHandlerRef = useRef<((data: unknown) => void) | null>(null);
@@ -37,6 +39,7 @@ export function usePartySocket(roomId: string | null) {
       setIsConnected(false);
       setPlayerId(null);
       setPlayers([]);
+      setLevel(null);
     });
 
     socket.addEventListener('message', (event) => {
@@ -47,10 +50,14 @@ export function usePartySocket(roomId: string | null) {
           case 'welcome':
             setPlayerId(data.playerId);
             setPlayers(data.players);
+            if (data.level) setLevel(data.level);
             break;
           case 'player-joined':
           case 'player-left':
             setPlayers(data.players);
+            break;
+          case 'level-update':
+            if (data.level) setLevel(data.level);
             break;
           default:
             messageHandlerRef.current?.(data);
@@ -72,11 +79,15 @@ export function usePartySocket(roomId: string | null) {
     }
   }, []);
 
+  const requestNewLevel = useCallback(() => {
+    send({ type: 'request-new-level' });
+  }, [send]);
+
   const onMessage = useCallback((handler: (data: unknown) => void) => {
     messageHandlerRef.current = handler;
   }, []);
 
   const localPlayer = players.find(p => p.id === playerId) ?? null;
 
-  return { isConnected, playerId, localPlayer, players, send, onMessage };
+  return { isConnected, playerId, localPlayer, players, level, send, requestNewLevel, onMessage };
 }

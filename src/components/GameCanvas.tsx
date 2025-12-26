@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import type { Tool } from '../types';
 import { useLocalPlayer } from '../hooks/useLocalPlayer';
 import { useGameState } from '../hooks/useGameState';
@@ -12,6 +12,8 @@ import { drawGrid, drawMarker, drawLines, drawLine, applyCameraTransform, calcul
 import { drawSkier } from '../lib/skier';
 import './GameCanvas.css';
 
+import type { Level } from '../lib/level-generator';
+
 type TransitionPhase = 'idle' | 'skier-out' | 'portals-out' | 'camera-move' | 'portals-in' | 'skier-in' | 'zoom-in';
 
 const ANIM_SPEED = 0.15;
@@ -20,7 +22,12 @@ function isAnimationDone(current: number, target: number): boolean {
   return Math.abs(current - target) < 0.02;
 }
 
-export function GameCanvas() {
+interface GameCanvasProps {
+  serverLevel?: Level | null;
+  onRequestNewLevel?: () => void;
+}
+
+export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | undefined>(undefined);
@@ -42,15 +49,20 @@ export function GameCanvas() {
   const roundCompleteTimeoutRef = useRef<number | null>(null);
   const hasShownRoundComplete = useRef(false);
 
-  const gameState = useGameState();
+  const gameState = useGameState(serverLevel);
   const { player, actions } = useLocalPlayer();
   const camera = useCamera(gameState.level.start);
   const timer = useTimer();
 
   const level = gameState.level;
-  const levelKey = useMemo(() => `${level.start.x}-${level.start.y}`, [level]);
+  const levelKey = level.id;
 
-  // Initialize player at level start
+  useEffect(() => {
+    if (serverLevel && serverLevel.id !== level.id) {
+      gameState.setLevel(serverLevel);
+    }
+  }, [serverLevel, level.id, gameState]);
+
   useEffect(() => {
     actions.initAtSpawn(level.start.x, level.start.y);
     
@@ -347,13 +359,18 @@ export function GameCanvas() {
       roundCompleteTimeoutRef.current = null;
     }
 
-    gameState.generateNextLevel();
+    if (onRequestNewLevel) {
+      onRequestNewLevel();
+    } else {
+      gameState.generateNextLevel();
+    }
+    
     actions.reset(level.start.x, level.start.y);
     timer.stop();
     setShowRoundComplete(false);
     setTransitionPhase('skier-out');
     skierScaleTarget.current = 0;
-  }, [actions, level.start, transitionPhase, timer, gameState]);
+  }, [actions, level.start, transitionPhase, timer, gameState, onRequestNewLevel]);
 
   const handleRetry = useCallback(() => {
     if (roundCompleteTimeoutRef.current) {

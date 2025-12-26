@@ -1,5 +1,6 @@
 import type { Party, PartyKitServer, Connection } from "partykit/server";
 import { generatePlayerName } from "./player-names";
+import { generateLevel, type Level } from "./level-generator";
 
 const PLAYER_COLORS = [
   "#EF4444", "#F97316", "#EAB308", "#22C55E",
@@ -14,6 +15,7 @@ interface Player {
 
 export default class SkiFallServer implements PartyKitServer {
   players: Map<string, Player> = new Map();
+  level: Level | null = null;
 
   constructor(readonly room: Party) {}
 
@@ -25,12 +27,17 @@ export default class SkiFallServer implements PartyKitServer {
     };
     
     this.players.set(conn.id, player);
+
+    if (!this.level) {
+      this.level = generateLevel();
+    }
     
     conn.send(JSON.stringify({
       type: "welcome",
       playerId: conn.id,
       player,
       players: Array.from(this.players.values()),
+      level: this.level,
     }));
     
     this.room.broadcast(
@@ -59,7 +66,17 @@ export default class SkiFallServer implements PartyKitServer {
     if (typeof message !== 'string') return;
     
     try {
-      JSON.parse(message);
+      const data = JSON.parse(message);
+      
+      if (data.type === 'request-new-level') {
+        this.level = generateLevel();
+        this.room.broadcast(JSON.stringify({
+          type: 'level-update',
+          level: this.level,
+        }));
+        return;
+      }
+      
       this.room.broadcast(message, [sender.id]);
     } catch {
       // Invalid JSON, ignore

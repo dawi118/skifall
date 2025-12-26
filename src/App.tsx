@@ -10,7 +10,7 @@ function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [roomId, setRoomId] = useState<string | null>(null);
   
-  const { isConnected, localPlayer, players } = usePartySocket(roomId);
+  const { isConnected, localPlayer, players, level, requestNewLevel } = usePartySocket(roomId);
 
   const handleJoinRoom = (code: string) => {
     setRoomId(code);
@@ -28,7 +28,7 @@ function App() {
 
   return (
     <>
-      <GameCanvas />
+      <GameCanvas serverLevel={level} onRequestNewLevel={requestNewLevel} />
       
       <div className="room-info">
         <div className="room-code">{roomId}</div>

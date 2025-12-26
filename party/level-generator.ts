@@ -1,11 +1,19 @@
-import type { Point } from '../types';
-import { LEVEL_BOUNDS } from './constants';
+export interface Point {
+  x: number;
+  y: number;
+}
 
 export interface Level {
   id: string;
   start: Point;
   finish: Point;
 }
+
+const LEVEL_BOUNDS = {
+  maxWidth: 2000,
+  maxHeight: 1500,
+  minSeparation: 0.33,
+};
 
 function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
@@ -34,3 +42,4 @@ export function generateLevel(): Level {
     finish: { x: finishX, y: finishY },
   };
 }
+

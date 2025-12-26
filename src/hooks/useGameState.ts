@@ -20,8 +20,8 @@ interface UseGameStateReturn {
   resetRound: () => void;
 }
 
-export function useGameState(): UseGameStateReturn {
-  const [level, setLevelState] = useState<Level>(() => generateLevel());
+export function useGameState(initialLevel?: Level | null): UseGameStateReturn {
+  const [level, setLevelState] = useState<Level>(() => initialLevel ?? generateLevel());
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null);
   const pendingLevelRef = useRef<Level | null>(null);
   const [pendingLevel, setPendingLevel] = useState<Level | null>(null);
