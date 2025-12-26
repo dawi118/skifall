@@ -6,5 +6,6 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true, // Listen on all network interfaces for local network testing
+    allowedHosts: ['eager-tools-tell.loca.lt', 'tricky-vans-work.loca.lt'],
   },
 })

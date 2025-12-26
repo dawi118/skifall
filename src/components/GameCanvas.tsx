@@ -1,16 +1,15 @@
 import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
-import type { Tool, SkierState } from '../types';
-import { usePhysics } from '../hooks/usePhysics';
+import type { Tool } from '../types';
+import { useLocalPlayer } from '../hooks/useLocalPlayer';
+import { useGameState } from '../hooks/useGameState';
 import { useCamera } from '../hooks/useCamera';
-import { useDrawing } from '../hooks/useDrawing';
 import { useTimer } from '../hooks/useTimer';
 import { Toolbar } from './Toolbar';
 import { Timer } from './Timer';
 import { RoundComplete } from './RoundComplete';
 import { COLORS, PLAYING_ZOOM, FINISH_ZONE_RADIUS } from '../lib/constants';
 import { drawGrid, drawMarker, drawLines, drawLine, applyCameraTransform, calculateFitBounds } from '../lib/renderer';
-import { drawSkier, calculateInitialPositions, type SkierRenderState } from '../lib/skier';
-import { generateLevel, type Level } from '../lib/level-generator';
+import { drawSkier } from '../lib/skier';
 import './GameCanvas.css';
 
 type TransitionPhase = 'idle' | 'skier-out' | 'portals-out' | 'camera-move' | 'portals-in' | 'skier-in' | 'zoom-in';
@@ -27,12 +26,8 @@ export function GameCanvas() {
   const animationFrameRef = useRef<number | undefined>(undefined);
   const lastTimeRef = useRef<number>(0);
 
-  const [level, setLevel] = useState<Level>(() => generateLevel());
-  const pendingLevelRef = useRef<Level | null>(null);
-
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [currentTool, setCurrentTool] = useState<Tool>('hand');
-  const [skierState, setSkierState] = useState<SkierState>('idle');
   const [isPanning, setIsPanning] = useState(false);
   const [hoveredLineId, setHoveredLineId] = useState<string | null>(null);
 
@@ -40,26 +35,24 @@ export function GameCanvas() {
   const [skierVisible, setSkierVisible] = useState(true);
   const [portalScale, setPortalScale] = useState(1);
   const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>('idle');
-  const [finishTime, setFinishTime] = useState<number | null>(null);
   const [showRoundComplete, setShowRoundComplete] = useState(false);
 
   const skierScaleTarget = useRef<number | null>(null);
   const portalScaleTarget = useRef<number | null>(null);
+  const roundCompleteTimeoutRef = useRef<number | null>(null);
+  const hasShownRoundComplete = useRef(false);
 
-  const [skierRenderState, setSkierRenderState] = useState<SkierRenderState>(() =>
-    calculateInitialPositions(level.start.x, level.start.y)
-  );
-
-  const physics = usePhysics();
-  const camera = useCamera(level.start);
-  const drawing = useDrawing();
+  const gameState = useGameState();
+  const { player, actions } = useLocalPlayer();
+  const camera = useCamera(gameState.level.start);
   const timer = useTimer();
 
+  const level = gameState.level;
   const levelKey = useMemo(() => `${level.start.x}-${level.start.y}`, [level]);
 
+  // Initialize player at level start
   useEffect(() => {
-    physics.initPhysics(level.start.x, level.start.y);
-    setSkierRenderState(calculateInitialPositions(level.start.x, level.start.y));
+    actions.initAtSpawn(level.start.x, level.start.y);
     
     const bounds = calculateFitBounds(level.start, level.finish, canvasSize.width, canvasSize.height);
     camera.setCamera({ x: bounds.centerX, y: bounds.centerY, zoom: bounds.zoom });
@@ -69,23 +62,7 @@ export function GameCanvas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [levelKey]);
 
-  useEffect(() => {
-    const physicsLineIds = new Set(physics.getLineIds());
-    const drawingLineIds = new Set(drawing.lines.map((l) => l.id));
-    
-    for (const id of physicsLineIds) {
-      if (!drawingLineIds.has(id)) {
-        physics.removeLine(id);
-      }
-    }
-    
-    for (const line of drawing.lines) {
-      if (!physicsLineIds.has(line.id)) {
-        physics.addLine(line);
-      }
-    }
-  }, [drawing.lines, physics]);
-
+  // Handle resize
   useEffect(() => {
     const handleResize = () => {
       if (containerRef.current) {
@@ -98,6 +75,7 @@ export function GameCanvas() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Transition state machine
   useEffect(() => {
     if (transitionPhase === 'idle') return;
 
@@ -106,18 +84,17 @@ export function GameCanvas() {
       setTransitionPhase('portals-out');
       portalScaleTarget.current = 0;
     } else if (transitionPhase === 'portals-out' && isAnimationDone(portalScale, 0)) {
-      if (pendingLevelRef.current) {
-        setLevel(pendingLevelRef.current);
-        drawing.clearLines();
+      if (gameState.pendingLevel) {
+        gameState.applyPendingLevel();
+        actions.clearLines();
 
         const bounds = calculateFitBounds(
-          pendingLevelRef.current.start,
-          pendingLevelRef.current.finish,
+          gameState.pendingLevel.start,
+          gameState.pendingLevel.finish,
           canvasSize.width,
           canvasSize.height
         );
         camera.setCamera({ x: bounds.centerX, y: bounds.centerY, zoom: bounds.zoom });
-        pendingLevelRef.current = null;
       }
       setTransitionPhase('camera-move');
       setTimeout(() => {
@@ -147,8 +124,9 @@ export function GameCanvas() {
         setTransitionPhase('idle');
       }, 500);
     }
-  }, [transitionPhase, skierScale, portalScale, camera, drawing, canvasSize, level.start]);
+  }, [transitionPhase, skierScale, portalScale, camera, actions, canvasSize, level.start, gameState]);
 
+  // Render function
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -166,37 +144,33 @@ export function GameCanvas() {
     drawGrid(ctx, camera.camera, width, height);
     drawMarker(ctx, level.start, 'START', COLORS.startZone, portalScale);
     drawMarker(ctx, level.finish, 'FINISH', COLORS.finishZone, portalScale);
-    drawLines(ctx, drawing.lines, hoveredLineId, portalScale);
+    drawLines(ctx, player.lines, hoveredLineId, portalScale);
 
-    if (drawing.currentStroke.length > 0) {
-      drawLine(ctx, drawing.currentStroke);
+    if (player.currentStroke.length > 0) {
+      drawLine(ctx, player.currentStroke);
     }
 
     if (skierVisible) {
-      drawSkier(ctx, skierRenderState, skierScale);
+      drawSkier(ctx, player.skierRenderState, skierScale);
     }
 
     ctx.restore();
-  }, [canvasSize, camera.camera, level, drawing.lines, drawing.currentStroke, skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale]);
+  }, [canvasSize, camera.camera, level, player.lines, player.currentStroke, player.skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale]);
 
+  // Game loop
   useEffect(() => {
     const loop = (time: number) => {
       const delta = lastTimeRef.current ? time - lastTimeRef.current : 16.67;
       lastTimeRef.current = time;
 
-      if (skierState === 'moving' || skierState === 'fallen' || skierState === 'finished') {
-        const result = physics.update(delta);
-        setSkierRenderState(result);
+      if (player.runState === 'moving' || player.runState === 'fallen' || player.runState === 'finished') {
+        const result = actions.update(delta);
 
-        if (result.crashed && skierState === 'moving') {
-          setSkierState('fallen');
-        }
-
-        if (skierState === 'moving' && !result.crashed) {
+        if (player.runState === 'moving' && !result.crashed) {
           const dx = result.skis.x - level.finish.x;
           const dy = result.skis.y - (level.finish.y - 20);
           if (dx * dx + dy * dy < FINISH_ZONE_RADIUS * FINISH_ZONE_RADIUS) {
-            setSkierState('finished');
+            actions.setRunState('finished');
           }
         }
 
@@ -237,11 +211,12 @@ export function GameCanvas() {
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [skierState, physics, camera, render, level.finish]);
+  }, [player.runState, actions, camera, render, level.finish]);
 
+  // Pointer handlers
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (skierState === 'moving' || transitionPhase !== 'idle') return;
+      if (player.runState === 'moving' || transitionPhase !== 'idle') return;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
@@ -250,19 +225,18 @@ export function GameCanvas() {
         camera.handlePanStart(e.clientX, e.clientY);
         setIsPanning(true);
       } else if (currentTool === 'pencil') {
-        drawing.startDrawing(camera.screenToWorld(e.clientX, e.clientY, rect));
+        actions.startDrawing(camera.screenToWorld(e.clientX, e.clientY, rect));
       } else if (currentTool === 'eraser') {
         const point = camera.screenToWorld(e.clientX, e.clientY, rect);
-        const erasedId = drawing.eraseLine(point);
-        if (erasedId) physics.removeLine(erasedId);
+        actions.eraseLine(point);
       }
     },
-    [skierState, transitionPhase, currentTool, camera, drawing, physics]
+    [player.runState, transitionPhase, currentTool, camera, actions]
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      if (skierState === 'moving' || transitionPhase !== 'idle') return;
+      if (player.runState === 'moving' || transitionPhase !== 'idle') return;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
@@ -271,23 +245,22 @@ export function GameCanvas() {
         camera.handlePanMove(e.clientX, e.clientY);
         setHoveredLineId(null);
       } else if (currentTool === 'pencil') {
-        if (drawing.isDrawing) {
-          drawing.continueDrawing(camera.screenToWorld(e.clientX, e.clientY, rect));
+        if (player.isDrawing) {
+          actions.continueDrawing(camera.screenToWorld(e.clientX, e.clientY, rect));
         }
         setHoveredLineId(null);
       } else if (currentTool === 'eraser') {
         const point = camera.screenToWorld(e.clientX, e.clientY, rect);
-        setHoveredLineId(drawing.getLineAtPoint(point));
+        setHoveredLineId(actions.getLineAtPoint(point));
         if (e.buttons > 0) {
-          const erasedId = drawing.eraseLine(point);
+          const erasedId = actions.eraseLine(point);
           if (erasedId) {
-            physics.removeLine(erasedId);
             setHoveredLineId(null);
           }
         }
       }
     },
-    [skierState, transitionPhase, currentTool, camera, drawing, physics]
+    [player.runState, player.isDrawing, transitionPhase, currentTool, camera, actions]
   );
 
   const handlePointerUp = useCallback(() => {
@@ -295,11 +268,11 @@ export function GameCanvas() {
       camera.handlePanEnd();
       setIsPanning(false);
     } else if (currentTool === 'pencil') {
-      const newLine = drawing.endDrawing();
-      if (newLine) physics.addLine(newLine);
+      actions.endDrawing();
     }
-  }, [currentTool, camera, drawing, physics]);
+  }, [currentTool, camera, actions]);
 
+  // Wheel handler
   const handleWheelRef = useRef(camera.handleWheel);
   useEffect(() => {
     handleWheelRef.current = camera.handleWheel;
@@ -313,34 +286,35 @@ export function GameCanvas() {
     return () => canvas.removeEventListener('wheel', onWheel);
   }, []);
 
+  // Middle mouse panning
   const handleMiddleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (e.button === 1 && skierState !== 'moving' && transitionPhase === 'idle') {
+      if (e.button === 1 && player.runState !== 'moving' && transitionPhase === 'idle') {
         e.preventDefault();
         camera.handlePanStart(e.clientX, e.clientY);
       }
     },
-    [camera, skierState, transitionPhase]
+    [camera, player.runState, transitionPhase]
   );
 
   const handleMiddleMouseMove = useCallback(
     (e: React.MouseEvent) => {
-      if (skierState !== 'moving' && transitionPhase === 'idle') {
+      if (player.runState !== 'moving' && transitionPhase === 'idle') {
         camera.handlePanMove(e.clientX, e.clientY);
       }
     },
-    [camera, skierState, transitionPhase]
+    [camera, player.runState, transitionPhase]
   );
 
   const handleMiddleMouseUp = useCallback(() => camera.handlePanEnd(), [camera]);
 
+  // Game actions
   const handlePlay = useCallback(() => {
-    if (skierState === 'idle' && transitionPhase === 'idle') {
-      setSkierState('moving');
-      physics.play();
+    if (player.runState === 'idle' && transitionPhase === 'idle') {
+      actions.play();
       camera.animateToZoom(PLAYING_ZOOM);
     }
-  }, [skierState, transitionPhase, physics, camera]);
+  }, [player.runState, transitionPhase, actions, camera]);
 
   const handleReset = useCallback(() => {
     if (transitionPhase !== 'idle') return;
@@ -350,22 +324,20 @@ export function GameCanvas() {
       roundCompleteTimeoutRef.current = null;
     }
 
-    setSkierState('idle');
-    physics.reset();
+    actions.reset(level.start.x, level.start.y);
+    gameState.resetRound();
     setShowRoundComplete(false);
-    setFinishTime(null);
 
     setSkierVisible(false);
     camera.animateToZoom(1);
     camera.setCamera((prev) => ({ ...prev, x: level.start.x, y: level.start.y }));
-    setSkierRenderState(calculateInitialPositions(level.start.x, level.start.y));
 
     setTimeout(() => {
       setSkierScale(0);
       setSkierVisible(true);
       skierScaleTarget.current = 1;
     }, 300);
-  }, [physics, camera, level.start, transitionPhase]);
+  }, [actions, camera, level.start, transitionPhase, gameState]);
 
   const handleNewLevel = useCallback(() => {
     if (transitionPhase !== 'idle') return;
@@ -375,15 +347,13 @@ export function GameCanvas() {
       roundCompleteTimeoutRef.current = null;
     }
 
-    pendingLevelRef.current = generateLevel();
-    setSkierState('idle');
-    physics.reset();
+    gameState.generateNextLevel();
+    actions.reset(level.start.x, level.start.y);
     timer.stop();
     setShowRoundComplete(false);
-    setFinishTime(null);
     setTransitionPhase('skier-out');
     skierScaleTarget.current = 0;
-  }, [physics, transitionPhase, timer]);
+  }, [actions, level.start, transitionPhase, timer, gameState]);
 
   const handleRetry = useCallback(() => {
     if (roundCompleteTimeoutRef.current) {
@@ -392,10 +362,9 @@ export function GameCanvas() {
     }
 
     setShowRoundComplete(false);
-    setFinishTime(null);
-    setSkierState('idle');
-    physics.reset();
-    drawing.clearLines();
+    actions.reset(level.start.x, level.start.y);
+    actions.clearLines();
+    gameState.resetRound();
     timer.reset();
     timer.start();
 
@@ -403,42 +372,41 @@ export function GameCanvas() {
     
     setSkierVisible(false);
     camera.setCamera({ x: bounds.centerX, y: bounds.centerY, zoom: bounds.zoom });
-    setSkierRenderState(calculateInitialPositions(level.start.x, level.start.y));
 
     setTimeout(() => {
       setSkierScale(0);
       setSkierVisible(true);
       skierScaleTarget.current = 1;
     }, 300);
-  }, [physics, camera, level, drawing, timer, canvasSize]);
+  }, [actions, camera, level, timer, canvasSize, gameState]);
 
-  const roundCompleteTimeoutRef = useRef<number | null>(null);
-  const hasShownRoundComplete = useRef(false);
-
+  // Round complete logic
   useEffect(() => {
-    if (skierState === 'finished' && !hasShownRoundComplete.current) {
+    if (player.runState === 'finished' && !hasShownRoundComplete.current) {
       hasShownRoundComplete.current = true;
-      setFinishTime(timer.timeElapsed);
+      const finishTime = timer.timeElapsed;
+      gameState.finishRound(finishTime);
       timer.stop();
       roundCompleteTimeoutRef.current = window.setTimeout(() => setShowRoundComplete(true), 500);
-    } else if (skierState === 'fallen' && !hasShownRoundComplete.current) {
+    } else if (player.runState === 'fallen' && !hasShownRoundComplete.current) {
       timer.stop();
-    } else if (skierState === 'idle') {
+    } else if (player.runState === 'idle') {
       hasShownRoundComplete.current = false;
     }
-  }, [skierState, timer]);
+  }, [player.runState, timer, gameState]);
 
   useEffect(() => {
-    if (timer.isExpired && skierState === 'moving' && !hasShownRoundComplete.current) {
+    const canDNF = player.runState === 'idle' || player.runState === 'moving';
+    if (timer.isExpired && canDNF && !hasShownRoundComplete.current) {
       hasShownRoundComplete.current = true;
-      setSkierState('fallen');
-      setFinishTime(null);
+      actions.setRunState('fallen');
+      gameState.finishRound(null);
       roundCompleteTimeoutRef.current = window.setTimeout(() => setShowRoundComplete(true), 500);
     }
-  }, [timer.isExpired, skierState]);
+  }, [timer.isExpired, player.runState, actions, gameState]);
 
   const isTransitioning = transitionPhase !== 'idle';
-  const showTimer = timer.isRunning || timer.isExpired || skierState === 'finished';
+  const showTimer = timer.isRunning || timer.isExpired || player.runState === 'finished' || player.runState === 'fallen';
   const canvasClass = `game-canvas tool-${currentTool}${isPanning ? ' panning' : ''}${hoveredLineId ? ' eraser-hover' : ''}`;
 
   return (
@@ -461,17 +429,17 @@ export function GameCanvas() {
       {showTimer && (
         <Timer
           timeRemaining={timer.timeRemaining}
-          isFinished={skierState === 'finished'}
+          isFinished={player.runState === 'finished'}
         />
       )}
 
       <div className="top-controls">
         <button
-          className={`start-btn ${skierState !== 'idle' ? 'reset' : ''}`}
-          onClick={skierState !== 'idle' ? handleReset : handlePlay}
+          className={`start-btn ${player.runState !== 'idle' ? 'reset' : ''}`}
+          onClick={player.runState !== 'idle' ? handleReset : handlePlay}
           disabled={isTransitioning}
         >
-          {skierState !== 'idle' ? '↺ Reset' : 'Start'}
+          {player.runState !== 'idle' ? '↺ Reset' : 'Start'}
         </button>
         <button
           className="new-level-btn"
@@ -484,7 +452,7 @@ export function GameCanvas() {
 
       <Toolbar
         currentTool={currentTool}
-        skierState={skierState}
+        skierState={player.runState}
         disabled={isTransitioning}
         onToolChange={(tool) => {
           setCurrentTool(tool);
@@ -492,9 +460,9 @@ export function GameCanvas() {
         }}
       />
 
-      {showRoundComplete && (
+      {showRoundComplete && gameState.roundResult && (
         <RoundComplete
-          timeElapsed={finishTime}
+          timeElapsed={gameState.roundResult.finishTime}
           onRetry={handleRetry}
           onNewLevel={handleNewLevel}
         />

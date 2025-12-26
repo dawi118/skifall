@@ -1,4 +1,7 @@
 import { SKIER_WIDTH, SKIER_HEIGHT, COLORS } from './constants';
+import type { SkierRenderState } from '../types';
+
+export type { SkierRenderState } from '../types';
 
 export const HEAD_RADIUS = 7;
 export const UPPER_BODY_WIDTH = SKIER_WIDTH;
@@ -7,20 +10,6 @@ export const LOWER_BODY_WIDTH = SKIER_WIDTH * 0.8;
 export const LOWER_BODY_HEIGHT = SKIER_HEIGHT * 0.35;
 export const SKI_WIDTH = SKIER_WIDTH * 1.5;
 export const SKI_HEIGHT = 4;
-
-interface SkierPartState {
-  x: number;
-  y: number;
-  angle: number;
-}
-
-export interface SkierRenderState {
-  head: SkierPartState;
-  upper: SkierPartState;
-  lower: SkierPartState;
-  skis: SkierPartState;
-  crashed: boolean;
-}
 
 export function calculateInitialPositions(spawnX: number, spawnY: number): SkierRenderState {
   const skiCenterY = spawnY;

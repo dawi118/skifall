@@ -17,3 +17,25 @@ export interface Camera {
   y: number;
   zoom: number;
 }
+
+export interface SkierPartState {
+  x: number;
+  y: number;
+  angle: number;
+}
+
+export interface SkierRenderState {
+  head: SkierPartState;
+  upper: SkierPartState;
+  lower: SkierPartState;
+  skis: SkierPartState;
+  crashed: boolean;
+}
+
+export interface PlayerRenderData {
+  id: string;
+  lines: Line[];
+  skierState: SkierRenderState;
+  opacity: number;
+  isLocal: boolean;
+}

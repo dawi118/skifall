@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { generateLevel, type Level } from '../lib/level-generator';
 import { calculateScore } from '../lib/scoring';
 
@@ -11,53 +11,60 @@ export interface RoundResult {
 
 interface UseGameStateReturn {
   level: Level;
-  roundPhase: RoundPhase;
+  pendingLevel: Level | null;
   roundResult: RoundResult | null;
-  newLevel: () => void;
-  startRound: () => void;
-  finishRound: (finishTime: number) => void;
-  dnfRound: () => void;
+  generateNextLevel: () => void;
+  applyPendingLevel: () => void;
+  setLevel: (level: Level) => void;
+  finishRound: (finishTime: number | null) => void;
   resetRound: () => void;
 }
 
 export function useGameState(): UseGameStateReturn {
-  const [level, setLevel] = useState<Level>(() => generateLevel());
-  const [roundPhase, setRoundPhase] = useState<RoundPhase>('ready');
+  const [level, setLevelState] = useState<Level>(() => generateLevel());
   const [roundResult, setRoundResult] = useState<RoundResult | null>(null);
+  const pendingLevelRef = useRef<Level | null>(null);
+  const [pendingLevel, setPendingLevel] = useState<Level | null>(null);
 
-  const newLevel = useCallback(() => {
-    setLevel(generateLevel());
-    setRoundPhase('ready');
+  const generateNextLevel = useCallback(() => {
+    const next = generateLevel();
+    pendingLevelRef.current = next;
+    setPendingLevel(next);
+  }, []);
+
+  const applyPendingLevel = useCallback(() => {
+    if (pendingLevelRef.current) {
+      setLevelState(pendingLevelRef.current);
+      pendingLevelRef.current = null;
+      setPendingLevel(null);
+      setRoundResult(null);
+    }
+  }, []);
+
+  const setLevel = useCallback((newLevel: Level) => {
+    setLevelState(newLevel);
     setRoundResult(null);
   }, []);
 
-  const startRound = useCallback(() => {
-    setRoundPhase('playing');
-    setRoundResult(null);
-  }, []);
-
-  const finishRound = useCallback((finishTime: number) => {
-    setRoundResult({ finishTime, score: calculateScore(finishTime) });
-    setRoundPhase('finished');
-  }, []);
-
-  const dnfRound = useCallback(() => {
-    setRoundResult({ finishTime: null, score: calculateScore(null) });
-    setRoundPhase('finished');
+  const finishRound = useCallback((finishTime: number | null) => {
+    setRoundResult({
+      finishTime,
+      score: calculateScore(finishTime),
+    });
   }, []);
 
   const resetRound = useCallback(() => {
-    setRoundPhase('ready');
+    setRoundResult(null);
   }, []);
 
   return {
     level,
-    roundPhase,
+    pendingLevel,
     roundResult,
-    newLevel,
-    startRound,
+    generateNextLevel,
+    applyPendingLevel,
+    setLevel,
     finishRound,
-    dnfRound,
     resetRound,
   };
 }
