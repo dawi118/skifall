@@ -7,19 +7,11 @@ export interface Player {
   color: string;
 }
 
-interface UsePartySocketReturn {
-  isConnected: boolean;
-  playerId: string | null;
-  players: Player[];
-  send: (data: unknown) => void;
-  onMessage: (handler: (data: unknown) => void) => void;
-}
-
 const PARTYKIT_HOST = import.meta.env.DEV 
   ? 'localhost:1999' 
   : 'ski-fall.your-username.partykit.dev';
 
-export function usePartySocket(roomId: string | null): UsePartySocketReturn {
+export function usePartySocket(roomId: string | null) {
   const [isConnected, setIsConnected] = useState(false);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -38,12 +30,10 @@ export function usePartySocket(roomId: string | null): UsePartySocketReturn {
     socketRef.current = socket;
 
     socket.addEventListener('open', () => {
-      console.log('[PartySocket] Connected to room:', roomId);
       setIsConnected(true);
     });
 
     socket.addEventListener('close', () => {
-      console.log('[PartySocket] Disconnected from room:', roomId);
       setIsConnected(false);
       setPlayerId(null);
       setPlayers([]);
@@ -52,7 +42,6 @@ export function usePartySocket(roomId: string | null): UsePartySocketReturn {
     socket.addEventListener('message', (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('[PartySocket] Message received:', data.type);
 
         switch (data.type) {
           case 'welcome':
@@ -64,13 +53,10 @@ export function usePartySocket(roomId: string | null): UsePartySocketReturn {
             setPlayers(data.players);
             break;
           default:
-            // Pass to custom handler
-            if (messageHandlerRef.current) {
-              messageHandlerRef.current(data);
-            }
+            messageHandlerRef.current?.(data);
         }
       } catch (e) {
-        console.error('[PartySocket] Failed to parse message:', e);
+        console.error('Failed to parse message:', e);
       }
     });
 
@@ -90,12 +76,5 @@ export function usePartySocket(roomId: string | null): UsePartySocketReturn {
     messageHandlerRef.current = handler;
   }, []);
 
-  return {
-    isConnected,
-    playerId,
-    players,
-    send,
-    onMessage,
-  };
+  return { isConnected, playerId, players, send, onMessage };
 }
-

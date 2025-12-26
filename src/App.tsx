@@ -4,7 +4,6 @@ import { usePartySocket } from './hooks/usePartySocket';
 import './App.css';
 
 function App() {
-  // For testing, use a hardcoded room ID
   const [roomId] = useState('test-room');
   const { isConnected, playerId, players } = usePartySocket(roomId);
 
@@ -12,7 +11,6 @@ function App() {
     <>
       <GameCanvas />
       
-      {/* Connection status overlay (for testing) */}
       <div style={{
         position: 'fixed',
         bottom: 20,
@@ -25,13 +23,9 @@ function App() {
         fontSize: 14,
         zIndex: 1000,
       }}>
-        {isConnected ? (
-          <>
-            🟢 Connected as {playerId?.slice(0, 8)}... ({players.length} player{players.length !== 1 ? 's' : ''})
-          </>
-        ) : (
-          <>🔴 Connecting...</>
-        )}
+        {isConnected 
+          ? `🟢 Connected as ${playerId?.slice(0, 8)}... (${players.length} player${players.length !== 1 ? 's' : ''})`
+          : '🔴 Connecting...'}
       </div>
     </>
   );
