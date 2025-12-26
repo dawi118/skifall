@@ -1,1 +1,42 @@
-/* App-level styles - minimal since GameCanvas is fullscreen */
+.room-info {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-family: 'Courier New', monospace;
+  z-index: 1000;
+}
+
+.room-code {
+  font-size: 16px;
+  font-weight: 700;
+  color: #3B82F6;
+}
+
+.player-count {
+  font-size: 14px;
+  color: #6B7280;
+}
+
+.leave-btn {
+  background: transparent;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #6B7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.leave-btn:hover {
+  border-color: #EF4444;
+  color: #EF4444;
+}

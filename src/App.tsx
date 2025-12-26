@@ -1,31 +1,43 @@
 import { useState } from 'react';
+import { HomeScreen } from './components/HomeScreen';
 import { GameCanvas } from './components/GameCanvas';
 import { usePartySocket } from './hooks/usePartySocket';
 import './App.css';
 
+type Screen = 'home' | 'game';
+
 function App() {
-  const [roomId] = useState('test-room');
-  const { isConnected, playerId, players } = usePartySocket(roomId);
+  const [screen, setScreen] = useState<Screen>('home');
+  const [roomId, setRoomId] = useState<string | null>(null);
+  
+  const { isConnected, players } = usePartySocket(roomId);
+
+  const handleJoinRoom = (code: string) => {
+    setRoomId(code);
+    setScreen('game');
+  };
+
+  const handleLeaveRoom = () => {
+    setRoomId(null);
+    setScreen('home');
+  };
+
+  if (screen === 'home') {
+    return <HomeScreen onJoinRoom={handleJoinRoom} />;
+  }
 
   return (
     <>
       <GameCanvas />
       
-      <div style={{
-        position: 'fixed',
-        bottom: 20,
-        left: 20,
-        background: isConnected ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)',
-        color: 'white',
-        padding: '8px 16px',
-        borderRadius: 8,
-        fontFamily: 'system-ui',
-        fontSize: 14,
-        zIndex: 1000,
-      }}>
-        {isConnected 
-          ? `🟢 Connected as ${playerId?.slice(0, 8)}... (${players.length} player${players.length !== 1 ? 's' : ''})`
-          : '🔴 Connecting...'}
+      <div className="room-info">
+        <div className="room-code">{roomId}</div>
+        <div className="player-count">
+          {isConnected 
+            ? `${players.length} player${players.length !== 1 ? 's' : ''}`
+            : 'Connecting...'}
+        </div>
+        <button className="leave-btn" onClick={handleLeaveRoom}>Leave</button>
       </div>
     </>
   );

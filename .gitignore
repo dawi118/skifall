@@ -1,3 +1,6 @@
+# PartyKit local state
+.partykit/
+
 # Logs
 logs
 *.log
