@@ -120,7 +120,8 @@
 }
 
 .content-layer.lobby-mode {
-  padding-top: 140px;
+  justify-content: center;
+  padding-top: 100px; /* Account for logo at top */
 }
 
 .floating-buttons {
@@ -128,40 +129,6 @@
   flex-direction: column;
   gap: 16px;
   align-items: center;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.floating-buttons.hidden {
-  pointer-events: none;
-  max-height: 0;
-  overflow: hidden;
-  margin: 0;
-  gap: 0;
-}
-
-.floating-buttons.hidden .menu-btn {
-  opacity: 0;
-  transform: translateY(30px) scale(0.9);
-}
-
-.floating-buttons.visible .menu-btn {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  transition: all 0.15s ease;
-}
-
-/* Staggered button animations */
-.menu-btn.btn-1 {
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s;
-}
-
-.menu-btn.btn-2 {
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.45s;
-}
-
-.floating-buttons.hidden .menu-btn.btn-1,
-.floating-buttons.hidden .menu-btn.btn-2 {
-  transition-delay: 0s;
 }
 
 .menu-btn {
@@ -170,20 +137,9 @@
   height: auto;
   cursor: pointer;
   filter: drop-shadow(0 4px 15px rgba(0, 0, 0, 0.3));
-  opacity: 0;
-  transform: translateY(30px) scale(0.9);
 }
 
-.floating-buttons.visible .menu-btn:hover {
-  transform: scale(1.05) translateY(-2px);
-  filter: drop-shadow(0 8px 25px rgba(0, 0, 0, 0.4));
-  transition: all 0.15s ease;
-}
-
-.floating-buttons.visible .menu-btn:active {
-  transform: scale(0.98);
-  transition: all 0.1s ease;
-}
+/* Hover/active handled by framer-motion */
 
 .floating-btn {
   border: none;
@@ -320,10 +276,6 @@
   font-size: 14px;
   margin: 0;
   font-family: system-ui, sans-serif;
-}
-
-.content-layer.lobby-mode {
-  padding-top: 30px;
 }
 
 /* Old game-logo styles removed - using home-logo now */

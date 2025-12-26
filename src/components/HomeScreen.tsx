@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { generateRoomCode, isValidRoomCode } from '../lib/room-codes';
 import { audioManager } from '../lib/audio';
+import { MenuButton } from './MenuButton';
 import type { Player } from '../hooks/usePartySocket';
 import backgroundGif from '../assets/images/homepage chalet advanced.gif';
 import logoImage from '../assets/images/skifall_logo_transparent.png';
@@ -106,25 +108,15 @@ export function HomeScreen({
 
       {/* Content layer - always in DOM */}
       <div className={`content-layer ${isInLobby ? 'lobby-mode' : ''} ${hasStarted ? 'visible' : ''}`}>
-        {/* Menu buttons - staggered pop-in */}
-        <div className={`floating-buttons ${showButtons ? 'visible' : 'hidden'}`}>
-          <img 
-            src={hostGameBtn} 
-            alt="Host Game" 
-            aria-label="Host Game"
-            aria-role="button"
-            className="menu-btn btn-1" 
-            onClick={handleHostGame}
-          />
-          <img 
-            src={joinLobbyBtn} 
-            alt="Join Lobby" 
-            aria-label="Join Lobby"
-            aria-role="button"
-            className="menu-btn btn-2" 
-            onClick={() => setMode('join')}
-          />
-        </div>
+        {/* Menu buttons - animated with framer-motion */}
+        <AnimatePresence>
+          {showButtons && (
+            <div className="floating-buttons">
+              <MenuButton src={hostGameBtn} alt="Host Game" onClick={handleHostGame} delay={0.3} />
+              <MenuButton src={joinLobbyBtn} alt="Join Lobby" onClick={() => setMode('join')} delay={0.45} />
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Join panel */}
         <div className={`floating-panel ${mode !== 'join' || isInLobby ? 'hidden' : ''}`}>

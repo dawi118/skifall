@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "framer-motion": "^12.23.26",
     "partysocket": "^1.1.10",
     "planck": "^1.4.2",
     "react": "^19.2.0",
