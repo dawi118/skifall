@@ -160,6 +160,16 @@ export default class SkiFallServer implements PartyKitServer {
         return;
       }
       
+      if (data.type === 'skier-position') {
+        this.room.broadcast(JSON.stringify({
+          type: 'skier-position',
+          playerId: sender.id,
+          state: data.state,
+          runState: data.runState,
+        }), [sender.id]);
+        return;
+      }
+      
       this.room.broadcast(message, [sender.id]);
     } catch {
       // Invalid JSON, ignore

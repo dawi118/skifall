@@ -10,16 +10,17 @@ import { RoundComplete } from './RoundComplete';
 import { COLORS, PLAYING_ZOOM, FINISH_ZONE_RADIUS, DEV_MODE } from '../lib/constants';
 import { DevMenu } from './DevMenu';
 import { drawGrid, drawMarker, drawLines, drawLine, applyCameraTransform, calculateFitBounds } from '../lib/renderer';
-import { drawSkier } from '../lib/skier';
+import { drawSkier, drawGhostSkier } from '../lib/skier';
 import './GameCanvas.css';
 
 import type { Level } from '../lib/level-generator';
-import type { Line } from '../types';
-import type { RemoteLine, Player } from '../hooks/usePartySocket';
+import type { Line, SkierRenderState, SkierState } from '../types';
+import type { RemoteLine, Player, RemoteSkier } from '../hooks/usePartySocket';
 
 type TransitionPhase = 'idle' | 'skier-out' | 'portals-out' | 'camera-move' | 'portals-in' | 'skier-in' | 'zoom-in';
 
 const ANIM_SPEED = 0.15;
+const SKIER_BROADCAST_INTERVAL = 66; // ~15Hz
 
 function isAnimationDone(current: number, target: number): boolean {
   return Math.abs(current - target) < 0.02;
@@ -29,22 +30,26 @@ interface GameCanvasProps {
   serverLevel?: Level | null;
   serverRoundStartTime?: number | null;
   remoteLines?: RemoteLine[];
+  remoteSkiers?: Map<string, RemoteSkier>;
   players?: Player[];
   hoveredPlayerId?: string | null;
   onRequestNewLevel?: () => void;
   onLineAdd?: (line: Line) => void;
   onLineRemove?: (lineId: string) => void;
+  onSkierPosition?: (state: SkierRenderState, runState: SkierState) => void;
 }
 
 export function GameCanvas({ 
   serverLevel, 
   serverRoundStartTime, 
   remoteLines = [],
+  remoteSkiers = new Map(),
   players = [],
   hoveredPlayerId,
   onRequestNewLevel,
   onLineAdd,
   onLineRemove,
+  onSkierPosition,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,6 +71,7 @@ export function GameCanvas({
   const portalScaleTarget = useRef<number | null>(null);
   const roundCompleteTimeoutRef = useRef<number | null>(null);
   const hasShownRoundComplete = useRef(false);
+  const lastSkierBroadcastRef = useRef<number>(0);
 
   const gameState = useGameState(serverLevel);
   const { player, actions } = useLocalPlayer();
@@ -193,21 +199,16 @@ export function GameCanvas({
     drawMarker(ctx, level.start, 'START', COLORS.startZone, portalScale);
     drawMarker(ctx, level.finish, 'FINISH', COLORS.finishZone, portalScale);
     
-    // Draw remote players' lines with their colors
     for (const line of remoteLines) {
       const linePlayer = players.find(p => p.id === line.playerId);
       const color = linePlayer?.color ?? COLORS.line;
       
-      // Determine opacity based on hover state
       let opacity: number;
       if (hoveredPlayerId === null) {
-        // No hover: all remote lines at 20%
         opacity = 0.2;
       } else if (line.playerId === hoveredPlayerId) {
-        // Hovered player's lines at 40%
         opacity = 0.4;
       } else {
-        // Other players' lines hidden when hovering
         opacity = 0;
       }
       
@@ -216,11 +217,20 @@ export function GameCanvas({
       }
     }
     
-    // Draw local player's lines
     drawLines(ctx, player.lines, hoveredLineId, portalScale);
 
     if (player.currentStroke.length > 0) {
       drawLine(ctx, player.currentStroke);
+    }
+
+    // Draw ghost skiers for remote players
+    for (const [, remoteSkier] of remoteSkiers) {
+      const skierPlayer = players.find(p => p.id === remoteSkier.playerId);
+      if (skierPlayer && remoteSkier.runState !== 'idle') {
+        const color = skierPlayer.color;
+        const opacity = hoveredPlayerId === remoteSkier.playerId ? 0.5 : 0.3;
+        drawGhostSkier(ctx, remoteSkier.state, color, opacity * portalScale);
+      }
     }
 
     if (skierVisible) {
@@ -228,7 +238,7 @@ export function GameCanvas({
     }
 
     ctx.restore();
-  }, [canvasSize, camera.camera, level, player.lines, player.currentStroke, player.skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale, remoteLines, players, hoveredPlayerId]);
+  }, [canvasSize, camera.camera, level, player.lines, player.currentStroke, player.skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale, remoteLines, players, hoveredPlayerId, remoteSkiers]);
 
   useEffect(() => {
     const loop = (time: number) => {
@@ -247,6 +257,13 @@ export function GameCanvas({
         }
 
         camera.followTarget({ x: result.upper.x, y: result.upper.y });
+        
+        // Broadcast skier position at ~15Hz
+        const now = performance.now();
+        if (now - lastSkierBroadcastRef.current >= SKIER_BROADCAST_INTERVAL) {
+          lastSkierBroadcastRef.current = now;
+          onSkierPosition?.(result, player.runState);
+        }
       }
 
       camera.updateAnimation();
@@ -283,7 +300,7 @@ export function GameCanvas({
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [player.runState, actions, camera, render, level.finish]);
+  }, [player.runState, actions, camera, render, level.finish, onSkierPosition]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {

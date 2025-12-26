@@ -79,3 +79,40 @@ export function drawSkier(ctx: CanvasRenderingContext2D, state: SkierRenderState
     ctx.restore();
   }
 }
+
+export function drawGhostSkier(
+  ctx: CanvasRenderingContext2D, 
+  state: SkierRenderState, 
+  color: string,
+  opacity = 0.3
+) {
+  const { head, upper, lower, skis } = state;
+
+  ctx.save();
+  ctx.globalAlpha = opacity;
+
+  // Draw all parts in the player's color
+  drawPart(ctx, skis.x, skis.y, skis.angle, () => {
+    ctx.fillStyle = color;
+    ctx.fillRect(-SKI_WIDTH / 2, -SKI_HEIGHT / 2, SKI_WIDTH, SKI_HEIGHT);
+  });
+
+  drawPart(ctx, lower.x, lower.y, lower.angle, () => {
+    ctx.fillStyle = color;
+    ctx.fillRect(-LOWER_BODY_WIDTH / 2, -LOWER_BODY_HEIGHT / 2, LOWER_BODY_WIDTH, LOWER_BODY_HEIGHT);
+  });
+
+  drawPart(ctx, upper.x, upper.y, upper.angle, () => {
+    ctx.fillStyle = color;
+    ctx.fillRect(-UPPER_BODY_WIDTH / 2, -UPPER_BODY_HEIGHT / 2, UPPER_BODY_WIDTH, UPPER_BODY_HEIGHT);
+  });
+
+  drawPart(ctx, head.x, head.y, head.angle, () => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, HEAD_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+}

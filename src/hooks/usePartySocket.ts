@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import PartySocket from 'partysocket';
 import type { Level } from '../lib/level-generator';
-import type { Line } from '../types';
+import type { Line, SkierRenderState, SkierState } from '../types';
 
 export interface Player {
   id: string;
@@ -12,6 +12,13 @@ export interface Player {
 
 export interface RemoteLine extends Line {
   playerId: string;
+}
+
+export interface RemoteSkier {
+  playerId: string;
+  state: SkierRenderState;
+  runState: SkierState;
+  timestamp: number;
 }
 
 const PARTYKIT_HOST = import.meta.env.DEV 
@@ -25,6 +32,7 @@ export function usePartySocket(roomId: string | null) {
   const [level, setLevel] = useState<Level | null>(null);
   const [roundStartTime, setRoundStartTime] = useState<number | null>(null);
   const [remoteLines, setRemoteLines] = useState<RemoteLine[]>([]);
+  const [remoteSkiers, setRemoteSkiers] = useState<Map<string, RemoteSkier>>(new Map());
   
   const socketRef = useRef<PartySocket | null>(null);
   const messageHandlerRef = useRef<((data: unknown) => void) | null>(null);
@@ -50,6 +58,7 @@ export function usePartySocket(roomId: string | null) {
       setLevel(null);
       setRoundStartTime(null);
       setRemoteLines([]);
+      setRemoteSkiers(new Map());
     });
 
     socket.addEventListener('message', (event) => {
@@ -72,11 +81,17 @@ export function usePartySocket(roomId: string | null) {
             if (data.removedLineIds) {
               setRemoteLines(prev => prev.filter(l => !data.removedLineIds.includes(l.id)));
             }
+            setRemoteSkiers(prev => {
+              const next = new Map(prev);
+              next.delete(data.playerId);
+              return next;
+            });
             break;
           case 'level-update':
             if (data.level) setLevel(data.level);
             if (data.roundStartTime) setRoundStartTime(data.roundStartTime);
             setRemoteLines([]);
+            setRemoteSkiers(new Map());
             break;
           case 'line-add':
             setRemoteLines(prev => [...prev, data.line]);
@@ -86,6 +101,18 @@ export function usePartySocket(roomId: string | null) {
             break;
           case 'lines-clear':
             setRemoteLines(prev => prev.filter(l => l.playerId !== data.playerId));
+            break;
+          case 'skier-position':
+            setRemoteSkiers(prev => {
+              const next = new Map(prev);
+              next.set(data.playerId, {
+                playerId: data.playerId,
+                state: data.state,
+                runState: data.runState,
+                timestamp: Date.now(),
+              });
+              return next;
+            });
             break;
           default:
             messageHandlerRef.current?.(data);
@@ -123,6 +150,10 @@ export function usePartySocket(roomId: string | null) {
     send({ type: 'lines-clear' });
   }, [send]);
 
+  const sendSkierPosition = useCallback((state: SkierRenderState, runState: SkierState) => {
+    send({ type: 'skier-position', state, runState });
+  }, [send]);
+
   const onMessage = useCallback((handler: (data: unknown) => void) => {
     messageHandlerRef.current = handler;
   }, []);
@@ -137,11 +168,13 @@ export function usePartySocket(roomId: string | null) {
     level, 
     roundStartTime, 
     remoteLines,
+    remoteSkiers,
     send, 
     requestNewLevel,
     sendLineAdd,
     sendLineRemove,
     sendLinesClear,
+    sendSkierPosition,
     onMessage,
   };
 }

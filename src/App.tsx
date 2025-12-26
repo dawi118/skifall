@@ -19,9 +19,11 @@ function App() {
     level,
     roundStartTime,
     remoteLines,
+    remoteSkiers,
     requestNewLevel,
     sendLineAdd,
     sendLineRemove,
+    sendSkierPosition,
   } = usePartySocket(roomId);
 
   const handleJoinRoom = (code: string) => {
@@ -39,11 +41,13 @@ function App() {
         serverLevel={level}
         serverRoundStartTime={roundStartTime}
         remoteLines={remoteLines}
+        remoteSkiers={remoteSkiers}
         players={players}
         hoveredPlayerId={hoveredPlayerId}
         onRequestNewLevel={requestNewLevel}
         onLineAdd={sendLineAdd}
         onLineRemove={sendLineRemove}
+        onSkierPosition={sendSkierPosition}
       />
 
       {isConnected && (
