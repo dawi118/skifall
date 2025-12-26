@@ -73,13 +73,14 @@ Add these **Secrets** (click "New repository secret"):
 
 | Name | Value |
 |------|-------|
-| `PARTYKIT_TOKEN` | The token from Step 1 |
+| `PARTYKIT_LOGIN` | Your PartyKit username (e.g., `sjmog`) |
+| `PARTYKIT_TOKEN` | The JWT token from Step 1 |
 
 Add these **Variables** (click the "Variables" tab, then "New repository variable"):
 
 | Name | Value |
 |------|-------|
-| `PARTYKIT_USERNAME` | Your PartyKit username |
+| `PARTYKIT_USERNAME` | Your PartyKit username (same as PARTYKIT_LOGIN) |
 
 ### Step 3: Set Up Netlify
 
@@ -184,8 +185,9 @@ No environment variables needed! The app defaults to `localhost:1999` for PartyK
 ### GitHub Actions
 | Secret/Variable | Type | Description |
 |-----------------|------|-------------|
-| `PARTYKIT_TOKEN` | Secret | Auth token for PartyKit deploys |
-| `PARTYKIT_USERNAME` | Variable | Your PartyKit username |
+| `PARTYKIT_LOGIN` | Secret | Your PartyKit username |
+| `PARTYKIT_TOKEN` | Secret | JWT auth token for PartyKit deploys |
+| `PARTYKIT_USERNAME` | Variable | Your PartyKit username (for output URLs) |
 
 ---
 

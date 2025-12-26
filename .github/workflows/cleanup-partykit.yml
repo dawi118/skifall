@@ -2,8 +2,9 @@ name: Cleanup PartyKit Preview
 
 on:
   delete:
-    branches:
-      - '**'
+
+env:
+  CI: true
 
 jobs:
   cleanup:
@@ -29,5 +30,6 @@ jobs:
           echo "🗑️ Deleting PartyKit deployment: ski-fall-${BRANCH_NAME}"
           npx partykit delete --name "ski-fall-${BRANCH_NAME}" --force || echo "Deployment may not exist, continuing..."
         env:
+          PARTYKIT_LOGIN: ${{ secrets.PARTYKIT_LOGIN }}
           PARTYKIT_TOKEN: ${{ secrets.PARTYKIT_TOKEN }}
 

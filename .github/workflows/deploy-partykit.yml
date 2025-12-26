@@ -10,6 +10,9 @@ on:
       - 'partykit.json'
       - '.github/workflows/deploy-partykit.yml'
 
+env:
+  CI: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -27,6 +30,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: npx partykit deploy
         env:
+          PARTYKIT_LOGIN: ${{ secrets.PARTYKIT_LOGIN }}
           PARTYKIT_TOKEN: ${{ secrets.PARTYKIT_TOKEN }}
       
       - name: Deploy to PartyKit (Preview)
@@ -35,6 +39,7 @@ jobs:
           BRANCH_NAME="${GITHUB_REF_NAME//\//-}"
           npx partykit deploy --name "ski-fall-${BRANCH_NAME}"
         env:
+          PARTYKIT_LOGIN: ${{ secrets.PARTYKIT_LOGIN }}
           PARTYKIT_TOKEN: ${{ secrets.PARTYKIT_TOKEN }}
       
       - name: Output deployment URL
