@@ -19,6 +19,12 @@
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   cursor: default;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.player-avatar:hover {
+  opacity: 1;
 }
 
 .player-avatar.local {
@@ -28,40 +34,5 @@
 .avatar-emoji {
   font-size: 24px;
   line-height: 1;
-}
-
-.avatar-tooltip {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-top: 8px;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.85);
-  color: white;
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  border-radius: 6px;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.15s ease;
-  pointer-events: none;
-}
-
-.avatar-tooltip::before {
-  content: '';
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 6px solid transparent;
-  border-bottom-color: rgba(0, 0, 0, 0.85);
-}
-
-.player-avatar:hover .avatar-tooltip {
-  opacity: 1;
-  visibility: visible;
 }
 

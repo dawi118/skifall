@@ -113,23 +113,13 @@
   transition: all 0.15s ease;
 }
 
-.retry-btn {
-  background: #F3F4F6;
-  color: #374151;
-}
-
-.retry-btn:hover {
-  background: #E5E7EB;
-  transform: translateY(-1px);
-}
-
-.round-complete-actions .new-level-btn {
-  background: #22C55E;
+.next-level-btn {
+  background: #3B82F6;
   color: white;
 }
 
-.round-complete-actions .new-level-btn:hover {
-  background: #16A34A;
+.next-level-btn:hover {
+  background: #2563EB;
   transform: translateY(-1px);
 }
 

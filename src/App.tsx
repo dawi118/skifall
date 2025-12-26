@@ -10,6 +10,7 @@ type Screen = "home" | "game";
 function App() {
   const [screen, setScreen] = useState<Screen>("home");
   const [roomId, setRoomId] = useState<string | null>(null);
+  const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
 
   const {
     isConnected,
@@ -21,7 +22,6 @@ function App() {
     requestNewLevel,
     sendLineAdd,
     sendLineRemove,
-    sendLinesClear,
   } = usePartySocket(roomId);
 
   const handleJoinRoom = (code: string) => {
@@ -39,14 +39,19 @@ function App() {
         serverLevel={level}
         serverRoundStartTime={roundStartTime}
         remoteLines={remoteLines}
+        players={players}
+        hoveredPlayerId={hoveredPlayerId}
         onRequestNewLevel={requestNewLevel}
         onLineAdd={sendLineAdd}
         onLineRemove={sendLineRemove}
-        onLinesClear={sendLinesClear}
       />
 
       {isConnected && (
-        <PlayerAvatars players={players} localPlayerId={playerId} />
+        <PlayerAvatars 
+          players={players} 
+          localPlayerId={playerId}
+          onHoverPlayer={setHoveredPlayerId}
+        />
       )}
     </>
   );

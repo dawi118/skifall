@@ -15,7 +15,7 @@ import './GameCanvas.css';
 
 import type { Level } from '../lib/level-generator';
 import type { Line } from '../types';
-import type { RemoteLine } from '../hooks/usePartySocket';
+import type { RemoteLine, Player } from '../hooks/usePartySocket';
 
 type TransitionPhase = 'idle' | 'skier-out' | 'portals-out' | 'camera-move' | 'portals-in' | 'skier-in' | 'zoom-in';
 
@@ -29,20 +29,22 @@ interface GameCanvasProps {
   serverLevel?: Level | null;
   serverRoundStartTime?: number | null;
   remoteLines?: RemoteLine[];
+  players?: Player[];
+  hoveredPlayerId?: string | null;
   onRequestNewLevel?: () => void;
   onLineAdd?: (line: Line) => void;
   onLineRemove?: (lineId: string) => void;
-  onLinesClear?: () => void;
 }
 
 export function GameCanvas({ 
   serverLevel, 
   serverRoundStartTime, 
   remoteLines = [],
+  players = [],
+  hoveredPlayerId,
   onRequestNewLevel,
   onLineAdd,
   onLineRemove,
-  onLinesClear,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -191,9 +193,27 @@ export function GameCanvas({
     drawMarker(ctx, level.start, 'START', COLORS.startZone, portalScale);
     drawMarker(ctx, level.finish, 'FINISH', COLORS.finishZone, portalScale);
     
-    // Draw remote players' lines at 20% opacity
-    if (remoteLines.length > 0) {
-      drawLines(ctx, remoteLines, null, 0.2 * portalScale);
+    // Draw remote players' lines with their colors
+    for (const line of remoteLines) {
+      const linePlayer = players.find(p => p.id === line.playerId);
+      const color = linePlayer?.color ?? COLORS.line;
+      
+      // Determine opacity based on hover state
+      let opacity: number;
+      if (hoveredPlayerId === null) {
+        // No hover: all remote lines at 20%
+        opacity = 0.2;
+      } else if (line.playerId === hoveredPlayerId) {
+        // Hovered player's lines at 40%
+        opacity = 0.4;
+      } else {
+        // Other players' lines hidden when hovering
+        opacity = 0;
+      }
+      
+      if (opacity > 0) {
+        drawLine(ctx, line.points, false, opacity * portalScale, color);
+      }
     }
     
     // Draw local player's lines
@@ -208,7 +228,7 @@ export function GameCanvas({
     }
 
     ctx.restore();
-  }, [canvasSize, camera.camera, level, player.lines, player.currentStroke, player.skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale, remoteLines]);
+  }, [canvasSize, camera.camera, level, player.lines, player.currentStroke, player.skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale, remoteLines, players, hoveredPlayerId]);
 
   useEffect(() => {
     const loop = (time: number) => {
@@ -414,32 +434,6 @@ export function GameCanvas({
     }
   }, [actions, level.start, transitionPhase, timer, gameState, onRequestNewLevel]);
 
-  const handleRetry = useCallback(() => {
-    if (roundCompleteTimeoutRef.current) {
-      clearTimeout(roundCompleteTimeoutRef.current);
-      roundCompleteTimeoutRef.current = null;
-    }
-
-    setShowRoundComplete(false);
-    actions.reset(level.start.x, level.start.y);
-    actions.clearLines();
-    onLinesClear?.();
-    gameState.resetRound();
-    timer.reset();
-    timer.start();
-
-    const bounds = calculateFitBounds(level.start, level.finish, canvasSize.width, canvasSize.height);
-    
-    setSkierVisible(false);
-    camera.setCamera({ x: bounds.centerX, y: bounds.centerY, zoom: bounds.zoom });
-
-    setTimeout(() => {
-      setSkierScale(0);
-      setSkierVisible(true);
-      skierScaleTarget.current = 1;
-    }, 300);
-  }, [actions, camera, level, timer, canvasSize, gameState, onLinesClear]);
-
   useEffect(() => {
     if (player.runState === 'finished' && !hasShownRoundComplete.current) {
       hasShownRoundComplete.current = true;
@@ -515,7 +509,7 @@ export function GameCanvas({
       {showRoundComplete && gameState.roundResult && (
         <RoundComplete
           timeElapsed={gameState.roundResult.finishTime}
-          onRetry={handleRetry}
+          onNextLevel={handleNewLevel}
         />
       )}
     </div>

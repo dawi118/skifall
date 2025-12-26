@@ -73,13 +73,14 @@ export function drawLine(
   ctx: CanvasRenderingContext2D,
   points: Point[],
   highlight = false,
-  opacity = 1
+  opacity = 1,
+  color?: string
 ) {
   if (points.length < 2 || opacity <= 0) return;
 
   ctx.save();
   ctx.globalAlpha = opacity;
-  ctx.strokeStyle = highlight ? COLORS.lineHighlight : COLORS.line;
+  ctx.strokeStyle = color ?? (highlight ? COLORS.lineHighlight : COLORS.line);
   ctx.lineWidth = highlight ? LINE_WIDTH + 2 : LINE_WIDTH;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';

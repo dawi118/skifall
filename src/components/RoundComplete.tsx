@@ -3,10 +3,10 @@ import './RoundComplete.css';
 
 interface RoundCompleteProps {
   timeElapsed: number | null;
-  onRetry: () => void;
+  onNextLevel: () => void;
 }
 
-export function RoundComplete({ timeElapsed, onRetry }: RoundCompleteProps) {
+export function RoundComplete({ timeElapsed, onNextLevel }: RoundCompleteProps) {
   const isDNF = timeElapsed === null;
   const score = calculateScore(timeElapsed);
 
@@ -34,8 +34,8 @@ export function RoundComplete({ timeElapsed, onRetry }: RoundCompleteProps) {
         </div>
 
         <div className="round-complete-actions">
-          <button className="retry-btn" onClick={onRetry}>
-            ↺ Retry
+          <button className="next-level-btn" onClick={onNextLevel}>
+            Next Level →
           </button>
         </div>
       </div>
