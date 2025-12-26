@@ -9,6 +9,7 @@ interface UseTimerReturn {
   start: () => void;
   stop: () => void;
   reset: () => void;
+  syncToServerTime: (serverStartTime: number) => void;
   getElapsedTime: () => number;
 }
 
@@ -19,6 +20,7 @@ export function useTimer(duration = ROUND_DURATION_SECONDS): UseTimerReturn {
   const [isExpired, setIsExpired] = useState(false);
 
   const startTimeRef = useRef<number | null>(null);
+  const serverOffsetRef = useRef<number>(0);
   const animationFrameRef = useRef<number | null>(null);
   const isRunningRef = useRef(false);
 
@@ -29,7 +31,7 @@ export function useTimer(duration = ROUND_DURATION_SECONDS): UseTimerReturn {
       if (startTimeRef.current === null || !isRunningRef.current) return;
 
       const now = performance.now();
-      const elapsed = (now - startTimeRef.current) / 1000;
+      const elapsed = (now - startTimeRef.current) / 1000 + serverOffsetRef.current;
       const remaining = Math.max(0, duration - elapsed);
 
       setTimeElapsed(elapsed);
@@ -59,6 +61,7 @@ export function useTimer(duration = ROUND_DURATION_SECONDS): UseTimerReturn {
   const start = useCallback(() => {
     if (isRunningRef.current) return;
     startTimeRef.current = performance.now();
+    serverOffsetRef.current = 0;
     isRunningRef.current = true;
     setIsRunning(true);
     setIsExpired(false);
@@ -79,11 +82,34 @@ export function useTimer(duration = ROUND_DURATION_SECONDS): UseTimerReturn {
     setTimeElapsed(0);
     setIsExpired(false);
     startTimeRef.current = null;
+    serverOffsetRef.current = 0;
   }, [stop, duration]);
+
+  const syncToServerTime = useCallback((serverStartTime: number) => {
+    const elapsedOnServer = (Date.now() - serverStartTime) / 1000;
+    const remaining = Math.max(0, duration - elapsedOnServer);
+    
+    if (remaining <= 0) {
+      setTimeRemaining(0);
+      setTimeElapsed(duration);
+      setIsExpired(true);
+      setIsRunning(false);
+      isRunningRef.current = false;
+      return;
+    }
+
+    serverOffsetRef.current = elapsedOnServer;
+    startTimeRef.current = performance.now();
+    isRunningRef.current = true;
+    setIsRunning(true);
+    setIsExpired(false);
+    setTimeRemaining(remaining);
+    setTimeElapsed(elapsedOnServer);
+  }, [duration]);
 
   const getElapsedTime = useCallback(() => {
     if (startTimeRef.current === null) return timeElapsed;
-    return (performance.now() - startTimeRef.current) / 1000;
+    return (performance.now() - startTimeRef.current) / 1000 + serverOffsetRef.current;
   }, [timeElapsed]);
 
   return {
@@ -94,6 +120,7 @@ export function useTimer(duration = ROUND_DURATION_SECONDS): UseTimerReturn {
     start,
     stop,
     reset,
+    syncToServerTime,
     getElapsedTime,
   };
 }

@@ -25,10 +25,11 @@ function isAnimationDone(current: number, target: number): boolean {
 
 interface GameCanvasProps {
   serverLevel?: Level | null;
+  serverRoundStartTime?: number | null;
   onRequestNewLevel?: () => void;
 }
 
-export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) {
+export function GameCanvas({ serverLevel, serverRoundStartTime, onRequestNewLevel }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | undefined>(undefined);
@@ -57,25 +58,39 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
 
   const level = gameState.level;
   const levelKey = level.id;
+  const pendingServerLevelRef = useRef<typeof serverLevel>(null);
+  const lastSyncedLevelRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (serverLevel && serverLevel.id !== level.id) {
-      gameState.setLevel(serverLevel);
-    }
-  }, [serverLevel, level.id, gameState]);
+    if (!serverLevel || serverLevel.id === level.id) return;
+    if (transitionPhase !== 'idle') return;
+    
+    pendingServerLevelRef.current = serverLevel;
+    actions.reset(level.start.x, level.start.y);
+    timer.stop();
+    setShowRoundComplete(false);
+    setTransitionPhase('skier-out');
+    skierScaleTarget.current = 0;
+  }, [serverLevel, level.id, transitionPhase, actions, level.start, timer]);
 
   useEffect(() => {
+    if (lastSyncedLevelRef.current === levelKey) return;
+    lastSyncedLevelRef.current = levelKey;
+    
     actions.initAtSpawn(level.start.x, level.start.y);
     
     const bounds = calculateFitBounds(level.start, level.finish, canvasSize.width, canvasSize.height);
     camera.setCamera({ x: bounds.centerX, y: bounds.centerY, zoom: bounds.zoom });
     
-    timer.reset();
-    timer.start();
+    if (serverRoundStartTime) {
+      timer.syncToServerTime(serverRoundStartTime);
+    } else {
+      timer.reset();
+      timer.start();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelKey]);
+  }, [levelKey, serverRoundStartTime]);
 
-  // Handle resize
   useEffect(() => {
     const handleResize = () => {
       if (containerRef.current) {
@@ -88,7 +103,6 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Transition state machine
   useEffect(() => {
     if (transitionPhase === 'idle') return;
 
@@ -97,13 +111,19 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
       setTransitionPhase('portals-out');
       portalScaleTarget.current = 0;
     } else if (transitionPhase === 'portals-out' && isAnimationDone(portalScale, 0)) {
-      if (gameState.pendingLevel) {
-        gameState.applyPendingLevel();
+      const pendingLevel = pendingServerLevelRef.current ?? gameState.pendingLevel;
+      if (pendingLevel) {
+        if (pendingServerLevelRef.current) {
+          gameState.setLevel(pendingServerLevelRef.current);
+          pendingServerLevelRef.current = null;
+        } else {
+          gameState.applyPendingLevel();
+        }
         actions.clearLines();
 
         const bounds = calculateFitBounds(
-          gameState.pendingLevel.start,
-          gameState.pendingLevel.finish,
+          pendingLevel.start,
+          pendingLevel.finish,
           canvasSize.width,
           canvasSize.height
         );
@@ -139,7 +159,6 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
     }
   }, [transitionPhase, skierScale, portalScale, camera, actions, canvasSize, level.start, gameState]);
 
-  // Render function
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -170,7 +189,6 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
     ctx.restore();
   }, [canvasSize, camera.camera, level, player.lines, player.currentStroke, player.skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale]);
 
-  // Game loop
   useEffect(() => {
     const loop = (time: number) => {
       const delta = lastTimeRef.current ? time - lastTimeRef.current : 16.67;
@@ -226,7 +244,6 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
     };
   }, [player.runState, actions, camera, render, level.finish]);
 
-  // Pointer handlers
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (player.runState === 'moving' || transitionPhase !== 'idle') return;
@@ -285,7 +302,6 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
     }
   }, [currentTool, camera, actions]);
 
-  // Wheel handler
   const handleWheelRef = useRef(camera.handleWheel);
   useEffect(() => {
     handleWheelRef.current = camera.handleWheel;
@@ -299,7 +315,6 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
     return () => canvas.removeEventListener('wheel', onWheel);
   }, []);
 
-  // Middle mouse panning
   const handleMiddleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (e.button === 1 && player.runState !== 'moving' && transitionPhase === 'idle') {
@@ -321,7 +336,6 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
 
   const handleMiddleMouseUp = useCallback(() => camera.handlePanEnd(), [camera]);
 
-  // Game actions
   const handlePlay = useCallback(() => {
     if (player.runState === 'idle' && transitionPhase === 'idle') {
       actions.play();
@@ -364,13 +378,12 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
       onRequestNewLevel();
     } else {
       gameState.generateNextLevel();
+      actions.reset(level.start.x, level.start.y);
+      timer.stop();
+      setShowRoundComplete(false);
+      setTransitionPhase('skier-out');
+      skierScaleTarget.current = 0;
     }
-    
-    actions.reset(level.start.x, level.start.y);
-    timer.stop();
-    setShowRoundComplete(false);
-    setTransitionPhase('skier-out');
-    skierScaleTarget.current = 0;
   }, [actions, level.start, transitionPhase, timer, gameState, onRequestNewLevel]);
 
   const handleRetry = useCallback(() => {
@@ -398,7 +411,6 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
     }, 300);
   }, [actions, camera, level, timer, canvasSize, gameState]);
 
-  // Round complete logic
   useEffect(() => {
     if (player.runState === 'finished' && !hasShownRoundComplete.current) {
       hasShownRoundComplete.current = true;

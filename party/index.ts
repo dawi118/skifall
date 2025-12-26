@@ -7,29 +7,38 @@ const PLAYER_COLORS = [
   "#06B6D4", "#3B82F6", "#8B5CF6", "#EC4899",
 ];
 
+const PLAYER_AVATARS = [
+  "⛷️", "🏂", "🎿", "🦊", "🐺", "🦅", "🐻‍❄️", "🦌",
+];
+
 interface Player {
   id: string;
   name: string;
   color: string;
+  avatar: string;
 }
 
 export default class SkiFallServer implements PartyKitServer {
   players: Map<string, Player> = new Map();
   level: Level | null = null;
+  roundStartTime: number | null = null;
 
   constructor(readonly room: Party) {}
 
   onConnect(conn: Connection) {
+    const playerIndex = this.players.size;
     const player: Player = {
       id: conn.id,
       name: generatePlayerName(),
-      color: PLAYER_COLORS[this.players.size % PLAYER_COLORS.length],
+      color: PLAYER_COLORS[playerIndex % PLAYER_COLORS.length],
+      avatar: PLAYER_AVATARS[playerIndex % PLAYER_AVATARS.length],
     };
     
     this.players.set(conn.id, player);
 
     if (!this.level) {
       this.level = generateLevel();
+      this.roundStartTime = Date.now();
     }
     
     conn.send(JSON.stringify({
@@ -38,6 +47,7 @@ export default class SkiFallServer implements PartyKitServer {
       player,
       players: Array.from(this.players.values()),
       level: this.level,
+      roundStartTime: this.roundStartTime,
     }));
     
     this.room.broadcast(
@@ -70,9 +80,11 @@ export default class SkiFallServer implements PartyKitServer {
       
       if (data.type === 'request-new-level') {
         this.level = generateLevel();
+        this.roundStartTime = Date.now();
         this.room.broadcast(JSON.stringify({
           type: 'level-update',
           level: this.level,
+          roundStartTime: this.roundStartTime,
         }));
         return;
       }

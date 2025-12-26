@@ -6,6 +6,7 @@ export interface Player {
   id: string;
   name: string;
   color: string;
+  avatar: string;
 }
 
 const PARTYKIT_HOST = import.meta.env.DEV 
@@ -17,6 +18,7 @@ export function usePartySocket(roomId: string | null) {
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [level, setLevel] = useState<Level | null>(null);
+  const [roundStartTime, setRoundStartTime] = useState<number | null>(null);
   
   const socketRef = useRef<PartySocket | null>(null);
   const messageHandlerRef = useRef<((data: unknown) => void) | null>(null);
@@ -40,6 +42,7 @@ export function usePartySocket(roomId: string | null) {
       setPlayerId(null);
       setPlayers([]);
       setLevel(null);
+      setRoundStartTime(null);
     });
 
     socket.addEventListener('message', (event) => {
@@ -51,6 +54,7 @@ export function usePartySocket(roomId: string | null) {
             setPlayerId(data.playerId);
             setPlayers(data.players);
             if (data.level) setLevel(data.level);
+            if (data.roundStartTime) setRoundStartTime(data.roundStartTime);
             break;
           case 'player-joined':
           case 'player-left':
@@ -58,6 +62,7 @@ export function usePartySocket(roomId: string | null) {
             break;
           case 'level-update':
             if (data.level) setLevel(data.level);
+            if (data.roundStartTime) setRoundStartTime(data.roundStartTime);
             break;
           default:
             messageHandlerRef.current?.(data);
@@ -89,5 +94,5 @@ export function usePartySocket(roomId: string | null) {
 
   const localPlayer = players.find(p => p.id === playerId) ?? null;
 
-  return { isConnected, playerId, localPlayer, players, level, send, requestNewLevel, onMessage };
+  return { isConnected, playerId, localPlayer, players, level, roundStartTime, send, requestNewLevel, onMessage };
 }
