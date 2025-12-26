@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { HomeScreen } from "./components/HomeScreen";
 import { GameCanvas } from "./components/GameCanvas";
 import { PlayerAvatars } from "./components/PlayerAvatars";
-import { AudioButton } from "./components/AudioButton";
 import { usePartySocket } from "./hooks/usePartySocket";
 import { preloadAllSprites } from "./lib/sprites";
 import { audioManager } from "./lib/audio";
@@ -18,12 +17,6 @@ function App() {
   const [roomId, setRoomId] = useState<string | null>(getInitialRoom);
   const [hasStarted, setHasStarted] = useState(false);
   const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
-
-  const handleToggleMute = () => {
-    const newMuted = audioManager.toggleMute();
-    setIsMuted(newMuted);
-  };
 
   // Preload character sprites on app start
   useEffect(() => {
@@ -73,8 +66,6 @@ function App() {
     setRoomId(code);
   };
 
-  const audioButton = <AudioButton isMuted={isMuted} onClick={handleToggleMute} />;
-
   // Show lobby in home screen when:
   // - We have a roomId AND we're connected AND in lobby phase
   // - OR we have a roomId but not connected yet (connecting state)
@@ -96,7 +87,6 @@ function App() {
           onSetReady={setReady}
           onSetTotalRounds={setTotalRoundsOption}
         />
-        {audioButton}
       </>
     );
   }
@@ -130,7 +120,6 @@ function App() {
           onHoverPlayer={setHoveredPlayerId}
         />
       )}
-      {audioButton}
     </>
   );
 }
