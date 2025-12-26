@@ -34,6 +34,7 @@ export function useCamera(initialPosition: Point = { x: 0, y: 0 }): UseCameraRet
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
+    targetZoom.current = null;
     setCamera((prev) => ({
       ...prev,
       zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev.zoom - e.deltaY * ZOOM_SPEED)),

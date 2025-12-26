@@ -55,6 +55,7 @@ export function usePartySocket(roomId: string | null) {
 
     const socket = new PartySocket({
       host: PARTYKIT_HOST,
+      party: 'main',
       room: roomId,
     });
 
