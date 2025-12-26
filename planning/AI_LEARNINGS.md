@@ -24,3 +24,6 @@ Concise directives for working on this codebase, ordered by frequency of relevan
 ## Animation (1x)
 - **Target refs + lerp in game loop** - pattern for smooth animations without React re-renders
 
+## Deployment (1x)
+- **Avoid double-broadcast on state transitions** - when server transitions game phase (e.g., all ready → start round), don't broadcast intermediate state; go straight to final state to avoid race conditions on client
+

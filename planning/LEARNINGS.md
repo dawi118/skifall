@@ -34,3 +34,9 @@
 - **Bug pattern**: Physics engine created in init effect, nulled in cleanup, not recreated on remount because guard prevents re-run
 - **Fix**: Don't null refs in cleanup when the resource will be needed after StrictMode double-mount. Let GC handle it on true unmount.
 
+### Deployment Architecture
+- **Netlify + PartyKit**: Frontend on Netlify, multiplayer server on PartyKit
+- **Environment-based routing**: `VITE_PARTYKIT_HOST` env var tells frontend which PartyKit server to connect to
+- **Branch previews**: Both services support preview deployments - Netlify auto-deploys branches, GitHub Actions deploys PartyKit with branch-specific names
+- **Avoid double-broadcast**: When server transitions game phases (all ready → start), don't broadcast intermediate state before calling `startRound()` - it causes race conditions on clients
+
