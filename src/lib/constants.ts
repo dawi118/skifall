@@ -1,3 +1,5 @@
+export const DEV_MODE = true;
+
 export const GRAVITY = 1;
 
 export const SKIER_WIDTH = 20;

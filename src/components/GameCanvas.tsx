@@ -7,7 +7,8 @@ import { useTimer } from '../hooks/useTimer';
 import { Toolbar } from './Toolbar';
 import { Timer } from './Timer';
 import { RoundComplete } from './RoundComplete';
-import { COLORS, PLAYING_ZOOM, FINISH_ZONE_RADIUS } from '../lib/constants';
+import { COLORS, PLAYING_ZOOM, FINISH_ZONE_RADIUS, DEV_MODE } from '../lib/constants';
+import { DevMenu } from './DevMenu';
 import { drawGrid, drawMarker, drawLines, drawLine, applyCameraTransform, calculateFitBounds } from '../lib/renderer';
 import { drawSkier } from '../lib/skier';
 import './GameCanvas.css';
@@ -450,6 +451,8 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
         />
       )}
 
+      {DEV_MODE && <DevMenu onNewLevel={handleNewLevel} />}
+
       <div className="top-controls">
         <button
           className={`start-btn ${player.runState !== 'idle' ? 'reset' : ''}`}
@@ -457,13 +460,6 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
           disabled={isTransitioning}
         >
           {player.runState !== 'idle' ? '↺ Reset' : 'Start'}
-        </button>
-        <button
-          className="new-level-btn"
-          onClick={handleNewLevel}
-          disabled={isTransitioning}
-        >
-          New Level
         </button>
       </div>
 
@@ -481,7 +477,6 @@ export function GameCanvas({ serverLevel, onRequestNewLevel }: GameCanvasProps) 
         <RoundComplete
           timeElapsed={gameState.roundResult.finishTime}
           onRetry={handleRetry}
-          onNewLevel={handleNewLevel}
         />
       )}
     </div>
