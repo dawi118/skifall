@@ -1,4 +1,5 @@
 import { SKIER_WIDTH, SKIER_HEIGHT, COLORS } from './constants';
+import { getSkierSprites, type SkierCharacter, type SkierSprites } from './sprites';
 import type { SkierRenderState } from '../types';
 
 export type { SkierRenderState } from '../types';
@@ -10,6 +11,19 @@ export const LOWER_BODY_WIDTH = SKIER_WIDTH * 0.8;
 export const LOWER_BODY_HEIGHT = SKIER_HEIGHT * 0.35;
 export const SKI_WIDTH = SKIER_WIDTH * 1.5;
 export const SKI_HEIGHT = 4;
+
+// Sprite rendering scale (pixels in sprite -> world units)
+const SPRITE_SCALE = 0.25;
+
+// Offsets to align sprite visual centers with physics body centers
+// The sprites are designed as stacking parts, but physics bodies have different centers
+// Negative Y moves sprite up, positive Y moves sprite down
+const SPRITE_OFFSETS = {
+  head: { x: 10, y: -40 },   // Head sprite - position above physics center (hat is tall)
+  torso: { x: -8, y: -12 },  // Torso - shift up (sprite includes shoulders above center)
+  legs: { x: 0, y: -11 },    // Legs - shift up (sprite has waistband above center)
+  skis: { x: 0, y: 0 },     // Skis - keep centered
+};
 
 export function calculateInitialPositions(spawnX: number, spawnY: number): SkierRenderState {
   const skiCenterY = spawnY;
@@ -43,8 +57,61 @@ function drawPart(
   ctx.restore();
 }
 
-export function drawSkier(ctx: CanvasRenderingContext2D, state: SkierRenderState, scale = 1) {
+function drawSpritePart(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  angle: number,
+  scale: number,
+  offsetX = 0,
+  offsetY = 0
+) {
+  const w = img.width * SPRITE_SCALE * scale;
+  const h = img.height * SPRITE_SCALE * scale;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.drawImage(img, -w / 2 + offsetX, -h / 2 + offsetY, w, h);
+  ctx.restore();
+}
+
+function drawFallbackPart(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angle: number,
+  width: number,
+  height: number,
+  color: string,
+  isCircle = false
+) {
+  drawPart(ctx, x, y, angle, () => {
+    ctx.fillStyle = color;
+    if (isCircle) {
+      ctx.beginPath();
+      ctx.arc(0, 0, width / 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillRect(-width / 2, -height / 2, width, height);
+    }
+  });
+}
+
+// Current character for local player (can be changed)
+let currentCharacter: SkierCharacter = 1;
+
+export function setSkierCharacter(character: SkierCharacter) {
+  currentCharacter = character;
+}
+
+export function getSkierCharacter(): SkierCharacter {
+  return currentCharacter;
+}
+
+export function drawSkier(ctx: CanvasRenderingContext2D, state: SkierRenderState, scale = 1, character?: SkierCharacter) {
   const { head, upper, lower, skis } = state;
+  const sprites = getSkierSprites(character ?? currentCharacter);
 
   if (scale !== 1) {
     ctx.save();
@@ -53,27 +120,19 @@ export function drawSkier(ctx: CanvasRenderingContext2D, state: SkierRenderState
     ctx.translate(-upper.x, -upper.y);
   }
 
-  drawPart(ctx, skis.x, skis.y, skis.angle, () => {
-    ctx.fillStyle = COLORS.skis;
-    ctx.fillRect(-SKI_WIDTH / 2, -SKI_HEIGHT / 2, SKI_WIDTH, SKI_HEIGHT);
-  });
-
-  drawPart(ctx, lower.x, lower.y, lower.angle, () => {
-    ctx.fillStyle = COLORS.legs;
-    ctx.fillRect(-LOWER_BODY_WIDTH / 2, -LOWER_BODY_HEIGHT / 2, LOWER_BODY_WIDTH, LOWER_BODY_HEIGHT);
-  });
-
-  drawPart(ctx, upper.x, upper.y, upper.angle, () => {
-    ctx.fillStyle = COLORS.skier;
-    ctx.fillRect(-UPPER_BODY_WIDTH / 2, -UPPER_BODY_HEIGHT / 2, UPPER_BODY_WIDTH, UPPER_BODY_HEIGHT);
-  });
-
-  drawPart(ctx, head.x, head.y, head.angle, () => {
-    ctx.fillStyle = COLORS.head;
-    ctx.beginPath();
-    ctx.arc(0, 0, HEAD_RADIUS, 0, Math.PI * 2);
-    ctx.fill();
-  });
+  if (sprites) {
+    // Draw with sprites (back to front: skis, legs, torso, head)
+    drawSpritePart(ctx, sprites.skis, skis.x, skis.y, skis.angle, scale, SPRITE_OFFSETS.skis.x, SPRITE_OFFSETS.skis.y);
+    drawSpritePart(ctx, sprites.legs, lower.x, lower.y, lower.angle, scale, SPRITE_OFFSETS.legs.x, SPRITE_OFFSETS.legs.y);
+    drawSpritePart(ctx, sprites.torso, upper.x, upper.y, upper.angle, scale, SPRITE_OFFSETS.torso.x, SPRITE_OFFSETS.torso.y);
+    drawSpritePart(ctx, sprites.head, head.x, head.y, head.angle, scale, SPRITE_OFFSETS.head.x, SPRITE_OFFSETS.head.y);
+  } else {
+    // Fallback to shapes if sprites not loaded
+    drawFallbackPart(ctx, skis.x, skis.y, skis.angle, SKI_WIDTH, SKI_HEIGHT, COLORS.skis);
+    drawFallbackPart(ctx, lower.x, lower.y, lower.angle, LOWER_BODY_WIDTH, LOWER_BODY_HEIGHT, COLORS.legs);
+    drawFallbackPart(ctx, upper.x, upper.y, upper.angle, UPPER_BODY_WIDTH, UPPER_BODY_HEIGHT, COLORS.skier);
+    drawFallbackPart(ctx, head.x, head.y, head.angle, HEAD_RADIUS * 2, HEAD_RADIUS * 2, COLORS.head, true);
+  }
 
   if (scale !== 1) {
     ctx.restore();
@@ -84,34 +143,28 @@ export function drawGhostSkier(
   ctx: CanvasRenderingContext2D, 
   state: SkierRenderState, 
   color: string,
-  opacity = 0.3
+  opacity = 0.3,
+  character?: SkierCharacter
 ) {
   const { head, upper, lower, skis } = state;
+  const sprites = getSkierSprites(character ?? currentCharacter);
 
   ctx.save();
   ctx.globalAlpha = opacity;
 
-  drawPart(ctx, skis.x, skis.y, skis.angle, () => {
-    ctx.fillStyle = color;
-    ctx.fillRect(-SKI_WIDTH / 2, -SKI_HEIGHT / 2, SKI_WIDTH, SKI_HEIGHT);
-  });
-
-  drawPart(ctx, lower.x, lower.y, lower.angle, () => {
-    ctx.fillStyle = color;
-    ctx.fillRect(-LOWER_BODY_WIDTH / 2, -LOWER_BODY_HEIGHT / 2, LOWER_BODY_WIDTH, LOWER_BODY_HEIGHT);
-  });
-
-  drawPart(ctx, upper.x, upper.y, upper.angle, () => {
-    ctx.fillStyle = color;
-    ctx.fillRect(-UPPER_BODY_WIDTH / 2, -UPPER_BODY_HEIGHT / 2, UPPER_BODY_WIDTH, UPPER_BODY_HEIGHT);
-  });
-
-  drawPart(ctx, head.x, head.y, head.angle, () => {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(0, 0, HEAD_RADIUS, 0, Math.PI * 2);
-    ctx.fill();
-  });
+  if (sprites) {
+    // Draw sprites for ghost (with reduced opacity)
+    drawSpritePart(ctx, sprites.skis, skis.x, skis.y, skis.angle, 1, SPRITE_OFFSETS.skis.x, SPRITE_OFFSETS.skis.y);
+    drawSpritePart(ctx, sprites.legs, lower.x, lower.y, lower.angle, 1, SPRITE_OFFSETS.legs.x, SPRITE_OFFSETS.legs.y);
+    drawSpritePart(ctx, sprites.torso, upper.x, upper.y, upper.angle, 1, SPRITE_OFFSETS.torso.x, SPRITE_OFFSETS.torso.y);
+    drawSpritePart(ctx, sprites.head, head.x, head.y, head.angle, 1, SPRITE_OFFSETS.head.x, SPRITE_OFFSETS.head.y);
+  } else {
+    // Fallback to colored shapes
+    drawFallbackPart(ctx, skis.x, skis.y, skis.angle, SKI_WIDTH, SKI_HEIGHT, color);
+    drawFallbackPart(ctx, lower.x, lower.y, lower.angle, LOWER_BODY_WIDTH, LOWER_BODY_HEIGHT, color);
+    drawFallbackPart(ctx, upper.x, upper.y, upper.angle, UPPER_BODY_WIDTH, UPPER_BODY_HEIGHT, color);
+    drawFallbackPart(ctx, head.x, head.y, head.angle, HEAD_RADIUS * 2, HEAD_RADIUS * 2, color, true);
+  }
 
   ctx.restore();
 }

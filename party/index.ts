@@ -33,6 +33,7 @@ interface PlayerState {
   name: string;
   color: string;
   avatar: string;
+  character: number; // 1-4 for different skier sprites
   isReady: boolean;
   isSpectating: boolean;
   roundResult: RoundResult | null;
@@ -158,6 +159,7 @@ export default class SkiFallServer implements PartyKitServer {
       name: generatePlayerName(),
       color: PLAYER_COLORS[playerIndex % PLAYER_COLORS.length],
       avatar: PLAYER_AVATARS[playerIndex % PLAYER_AVATARS.length],
+      character: (playerIndex % 4) + 1, // 1-4 for skier sprites
       isReady: false,
       isSpectating,
       roundResult: null,

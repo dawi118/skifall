@@ -27,7 +27,8 @@ import {
   applyCameraTransform,
   calculateFitBounds,
 } from "../lib/renderer";
-import { drawSkier, drawGhostSkier } from "../lib/skier";
+import { drawSkier, drawGhostSkier, setSkierCharacter } from "../lib/skier";
+import type { SkierCharacter } from "../lib/sprites";
 import {
   isAnimationDone,
   animateToward,
@@ -138,6 +139,13 @@ export function GameCanvas({
   const levelKey = level.id;
   const pendingServerLevelRef = useRef<typeof serverLevel>(null);
   const lastSyncedLevelRef = useRef<string | null>(null);
+
+  // Set local player's character sprite
+  useEffect(() => {
+    if (localPlayer?.character) {
+      setSkierCharacter(localPlayer.character as SkierCharacter);
+    }
+  }, [localPlayer?.character]);
 
   useEffect(() => {
     if (!serverLevel || serverLevel.id === level.id) return;
@@ -331,7 +339,8 @@ export function GameCanvas({
       if (skierPlayer) {
         const color = skierPlayer.color;
         const opacity = hoveredPlayerId === playerId ? 0.5 : 0.3;
-        drawGhostSkier(ctx, interpolatedState, color, opacity * portalScale);
+        const character = (skierPlayer.character || 1) as SkierCharacter;
+        drawGhostSkier(ctx, interpolatedState, color, opacity * portalScale, character);
       }
     }
 

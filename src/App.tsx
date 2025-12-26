@@ -1,13 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HomeScreen } from "./components/HomeScreen";
 import { Lobby } from "./components/Lobby";
 import { GameCanvas } from "./components/GameCanvas";
 import { PlayerAvatars } from "./components/PlayerAvatars";
 import { usePartySocket } from "./hooks/usePartySocket";
+import { preloadAllSprites } from "./lib/sprites";
 import "./App.css";
 
 function App() {
   const [roomId, setRoomId] = useState<string | null>(null);
+
+  // Preload character sprites on app start
+  useEffect(() => {
+    preloadAllSprites();
+  }, []);
   const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
 
   const {
