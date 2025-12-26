@@ -21,9 +21,40 @@ type TransitionPhase = 'idle' | 'skier-out' | 'portals-out' | 'camera-move' | 'p
 
 const ANIM_SPEED = 0.15;
 const SKIER_BROADCAST_INTERVAL = 66; // ~15Hz
+const GHOST_LERP_SPEED = 0.25;
 
 function isAnimationDone(current: number, target: number): boolean {
   return Math.abs(current - target) < 0.02;
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function lerpSkierState(current: SkierRenderState, target: SkierRenderState, t: number): SkierRenderState {
+  return {
+    head: {
+      x: lerp(current.head.x, target.head.x, t),
+      y: lerp(current.head.y, target.head.y, t),
+      angle: lerp(current.head.angle, target.head.angle, t),
+    },
+    upper: {
+      x: lerp(current.upper.x, target.upper.x, t),
+      y: lerp(current.upper.y, target.upper.y, t),
+      angle: lerp(current.upper.angle, target.upper.angle, t),
+    },
+    lower: {
+      x: lerp(current.lower.x, target.lower.x, t),
+      y: lerp(current.lower.y, target.lower.y, t),
+      angle: lerp(current.lower.angle, target.lower.angle, t),
+    },
+    skis: {
+      x: lerp(current.skis.x, target.skis.x, t),
+      y: lerp(current.skis.y, target.skis.y, t),
+      angle: lerp(current.skis.angle, target.skis.angle, t),
+    },
+    crashed: target.crashed,
+  };
 }
 
 interface GameCanvasProps {
@@ -72,6 +103,7 @@ export function GameCanvas({
   const roundCompleteTimeoutRef = useRef<number | null>(null);
   const hasShownRoundComplete = useRef(false);
   const lastSkierBroadcastRef = useRef<number>(0);
+  const interpolatedSkiersRef = useRef<Map<string, SkierRenderState>>(new Map());
 
   const gameState = useGameState(serverLevel);
   const { player, actions } = useLocalPlayer();
@@ -93,7 +125,8 @@ export function GameCanvas({
     setShowRoundComplete(false);
     setTransitionPhase('skier-out');
     skierScaleTarget.current = 0;
-  }, [serverLevel, level.id, transitionPhase, actions, level.start, timer]);
+    onSkierPosition?.(player.skierRenderState, 'idle');
+  }, [serverLevel, level.id, transitionPhase, actions, level.start, timer, onSkierPosition, player.skierRenderState]);
 
   useEffect(() => {
     if (lastSyncedLevelRef.current === levelKey) return;
@@ -223,13 +256,13 @@ export function GameCanvas({
       drawLine(ctx, player.currentStroke);
     }
 
-    // Draw ghost skiers for remote players
-    for (const [, remoteSkier] of remoteSkiers) {
-      const skierPlayer = players.find(p => p.id === remoteSkier.playerId);
-      if (skierPlayer && remoteSkier.runState !== 'idle') {
+    // Draw interpolated ghost skiers
+    for (const [playerId, interpolatedState] of interpolatedSkiersRef.current) {
+      const skierPlayer = players.find(p => p.id === playerId);
+      if (skierPlayer) {
         const color = skierPlayer.color;
-        const opacity = hoveredPlayerId === remoteSkier.playerId ? 0.5 : 0.3;
-        drawGhostSkier(ctx, remoteSkier.state, color, opacity * portalScale);
+        const opacity = hoveredPlayerId === playerId ? 0.5 : 0.3;
+        drawGhostSkier(ctx, interpolatedState, color, opacity * portalScale);
       }
     }
 
@@ -238,7 +271,7 @@ export function GameCanvas({
     }
 
     ctx.restore();
-  }, [canvasSize, camera.camera, level, player.lines, player.currentStroke, player.skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale, remoteLines, players, hoveredPlayerId, remoteSkiers]);
+  }, [canvasSize, camera.camera, level, player.lines, player.currentStroke, player.skierRenderState, hoveredLineId, skierScale, skierVisible, portalScale, remoteLines, players, hoveredPlayerId]);
 
   useEffect(() => {
     const loop = (time: number) => {
@@ -292,6 +325,26 @@ export function GameCanvas({
         });
       }
 
+      for (const [playerId, remoteSkier] of remoteSkiers) {
+        const current = interpolatedSkiersRef.current.get(playerId);
+        if (current && remoteSkier.runState !== 'idle') {
+          interpolatedSkiersRef.current.set(
+            playerId,
+            lerpSkierState(current, remoteSkier.state, GHOST_LERP_SPEED)
+          );
+        } else if (remoteSkier.runState !== 'idle') {
+          interpolatedSkiersRef.current.set(playerId, remoteSkier.state);
+        } else {
+          interpolatedSkiersRef.current.delete(playerId);
+        }
+      }
+      
+      for (const playerId of interpolatedSkiersRef.current.keys()) {
+        if (!remoteSkiers.has(playerId)) {
+          interpolatedSkiersRef.current.delete(playerId);
+        }
+      }
+
       render();
       animationFrameRef.current = requestAnimationFrame(loop);
     };
@@ -300,7 +353,7 @@ export function GameCanvas({
     return () => {
       if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
-  }, [player.runState, actions, camera, render, level.finish, onSkierPosition]);
+  }, [player.runState, actions, camera, render, level.finish, onSkierPosition, remoteSkiers]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -419,6 +472,9 @@ export function GameCanvas({
     actions.reset(level.start.x, level.start.y);
     gameState.resetRound();
     setShowRoundComplete(false);
+    
+
+    onSkierPosition?.(player.skierRenderState, 'idle');
 
     setSkierVisible(false);
     camera.animateToZoom(1);
@@ -429,7 +485,7 @@ export function GameCanvas({
       setSkierVisible(true);
       skierScaleTarget.current = 1;
     }, 300);
-  }, [actions, camera, level.start, transitionPhase, gameState]);
+  }, [actions, camera, level.start, transitionPhase, gameState, onSkierPosition, player.skierRenderState]);
 
   const handleNewLevel = useCallback(() => {
     if (transitionPhase !== 'idle') return;
