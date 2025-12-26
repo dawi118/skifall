@@ -142,6 +142,15 @@ export default class SkiFallServer implements PartyKitServer {
   }
 
   onConnect(conn: Connection) {
+    // Reset to lobby if this is the first player joining an empty room
+    if (this.players.size === 0 && this.gamePhase !== 'lobby') {
+      this.gamePhase = 'lobby';
+      this.currentRound = 0;
+      this.level = null;
+      this.roundStartTime = null;
+      this.lines.clear();
+    }
+    
     const playerIndex = this.players.size;
     const isSpectating = this.gamePhase === 'playing';
     
