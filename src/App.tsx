@@ -10,7 +10,7 @@ function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [roomId, setRoomId] = useState<string | null>(null);
   
-  const { isConnected, players } = usePartySocket(roomId);
+  const { isConnected, localPlayer, players } = usePartySocket(roomId);
 
   const handleJoinRoom = (code: string) => {
     setRoomId(code);
@@ -32,6 +32,11 @@ function App() {
       
       <div className="room-info">
         <div className="room-code">{roomId}</div>
+        {localPlayer && (
+          <div className="local-player" style={{ color: localPlayer.color }}>
+            {localPlayer.name}
+          </div>
+        )}
         <div className="player-count">
           {isConnected 
             ? `${players.length} player${players.length !== 1 ? 's' : ''}`

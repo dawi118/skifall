@@ -1,4 +1,5 @@
 import type { Party, PartyKitServer, Connection } from "partykit/server";
+import { generatePlayerName } from "./player-names";
 
 const PLAYER_COLORS = [
   "#EF4444", "#F97316", "#EAB308", "#22C55E",
@@ -19,8 +20,8 @@ export default class SkiFallServer implements PartyKitServer {
   onConnect(conn: Connection) {
     const player: Player = {
       id: conn.id,
-      name: `Player ${this.players.size + 1}`,
-      color: PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)],
+      name: generatePlayerName(),
+      color: PLAYER_COLORS[this.players.size % PLAYER_COLORS.length],
     };
     
     this.players.set(conn.id, player);

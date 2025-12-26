@@ -76,5 +76,7 @@ export function usePartySocket(roomId: string | null) {
     messageHandlerRef.current = handler;
   }, []);
 
-  return { isConnected, playerId, players, send, onMessage };
+  const localPlayer = players.find(p => p.id === playerId) ?? null;
+
+  return { isConnected, playerId, localPlayer, players, send, onMessage };
 }

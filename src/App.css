@@ -14,9 +14,14 @@
 }
 
 .room-code {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: #3B82F6;
+}
+
+.local-player {
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .player-count {
