@@ -1,7 +1,7 @@
 import * as planck from 'planck';
 import type { Line } from '../types';
 import { smoothLineWithSpline } from './line-utils';
-import { GRAVITY } from './constants';
+import { GRAVITY, CRASH_VELOCITY_THRESHOLD } from './constants';
 import {
   HEAD_RADIUS,
   UPPER_BODY_WIDTH,
@@ -177,12 +177,18 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
     const userDataA = bodyA.getUserData() as { type: string } | null;
     const userDataB = bodyB.getUserData() as { type: string } | null;
 
-    const isBodyHit =
-      (userDataA?.type === 'body' && bodyB === groundBody) ||
-      (userDataB?.type === 'body' && bodyA === groundBody);
+    const bodyHitGround = userDataA?.type === 'body' && bodyB === groundBody;
+    const groundHitBody = userDataB?.type === 'body' && bodyA === groundBody;
 
-    if (isBodyHit && !engine.crashed && engine.hipJoint) {
-      engine.crashed = true;
+    if ((bodyHitGround || groundHitBody) && !engine.crashed && engine.hipJoint) {
+      const bodyPart = bodyHitGround ? bodyA : bodyB;
+      
+      const velocity = bodyPart.getLinearVelocity();
+      const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+      
+      if (speed > CRASH_VELOCITY_THRESHOLD) {
+        engine.crashed = true;
+      }
     }
   });
 

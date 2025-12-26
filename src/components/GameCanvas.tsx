@@ -79,13 +79,13 @@ export function GameCanvas({
   const [isPanning, setIsPanning] = useState(false);
   const [hoveredLineId, setHoveredLineId] = useState<string | null>(null);
 
-  const [skierScale, setSkierScale] = useState(1);
+  const [skierScale, setSkierScale] = useState(0);
   const [skierVisible, setSkierVisible] = useState(true);
-  const [portalScale, setPortalScale] = useState(1);
-  const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>('idle');
+  const [portalScale, setPortalScale] = useState(0);
+  const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>('portals-in');
 
   const skierScaleTarget = useRef<number | null>(null);
-  const portalScaleTarget = useRef<number | null>(null);
+  const portalScaleTarget = useRef<number | null>(1);  // Start with target=1 for intro animation
   const lastSkierBroadcastRef = useRef<number>(0);
   const interpolatedSkiersRef = useRef<Map<string, SkierRenderState>>(new Map());
 

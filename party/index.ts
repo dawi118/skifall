@@ -225,7 +225,6 @@ export default class SkiFallServer implements PartyKitServer {
       
       if (data.type === 'set-ready') {
         player.isReady = data.isReady;
-        this.broadcastGameState();
         
         if (this.gamePhase === 'lobby' && this.checkAllPlayersReady()) {
           this.startRound();
@@ -235,6 +234,8 @@ export default class SkiFallServer implements PartyKitServer {
           } else {
             this.startRound();
           }
+        } else {
+          this.broadcastGameState();
         }
         return;
       }
