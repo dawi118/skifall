@@ -28,6 +28,8 @@ import {
   calculateFitBounds,
 } from "../lib/renderer";
 import { drawSkier, drawGhostSkier, setSkierCharacter } from "../lib/skier";
+import startBtnImg from "../assets/images/start.png";
+import resetBtnImg from "../assets/images/reset.png";
 import type { SkierCharacter } from "../lib/sprites";
 import {
   isAnimationDone,
@@ -766,13 +768,12 @@ export function GameCanvas({
       {DEV_MODE && <DevMenu onNewLevel={handleNewLevel} />}
 
       <div className="top-controls">
-        <button
-          className={`start-btn ${player.runState !== "idle" ? "reset" : ""}`}
-          onClick={player.runState !== "idle" ? handleReset : handlePlay}
-          disabled={isTransitioning}
-        >
-          {player.runState !== "idle" ? "↺ Reset" : "Start"}
-        </button>
+        <img
+          src={player.runState !== "idle" ? resetBtnImg : startBtnImg}
+          alt={player.runState !== "idle" ? "Reset" : "Start"}
+          className={`game-btn ${isTransitioning ? "disabled" : ""}`}
+          onClick={isTransitioning ? undefined : (player.runState !== "idle" ? handleReset : handlePlay)}
+        />
       </div>
 
       <Toolbar

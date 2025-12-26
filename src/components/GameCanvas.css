@@ -51,48 +51,26 @@
 }
 
 /* Start/Reset button */
-.start-btn {
-  padding: 8px 16px;
-  font-family: 'VT323', 'Courier New', monospace;
-  font-size: 28px;
-  font-weight: bold;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: #fff;
-  background: #22C55E;
-  border: none;
-  border-radius: 4px;
+.game-btn {
+  width: 240px;
+  height: auto;
   cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow: 
-    0 2px 8px rgba(34, 197, 94, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.1s ease-out;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
 }
 
-.start-btn:hover:not(:disabled) {
-  background: #16A34A;
-  transform: translateY(-1px);
-  box-shadow: 
-    0 4px 12px rgba(34, 197, 94, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+.game-btn:hover {
+  transform: scale(1.05);
 }
 
-.start-btn:active {
-  transform: translateY(0);
+.game-btn:active {
+  transform: scale(0.95);
 }
 
-.start-btn.reset {
-  background: #F59E0B;
-  box-shadow: 
-    0 2px 8px rgba(245, 158, 11, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-.start-btn.reset:hover:not(:disabled) {
-  background: #D97706;
-  box-shadow: 
-    0 4px 12px rgba(245, 158, 11, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+.game-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* New Level button */
@@ -116,20 +94,11 @@
   transform: translateY(-1px);
 }
 
-/* Disabled state for both buttons */
-.start-btn:disabled,
+/* Disabled state for buttons */
 .new-level-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
-}
-
-.start-btn:disabled {
-  background: #9CA3AF;
-  box-shadow: none;
-}
-
-.new-level-btn:disabled {
   background: #F9FAFB;
   border-color: #E5E7EB;
 }
