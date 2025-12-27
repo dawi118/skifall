@@ -3,6 +3,7 @@ import { usePhysics } from './usePhysics';
 import { useDrawing } from './useDrawing';
 import type { Point, Line, SkierState } from '../types';
 import { calculateInitialPositions, type SkierRenderState } from '../lib/skier';
+import type { StaticObstacle, WindZone } from '../lib/level-generator';
 
 export interface LocalPlayer {
   id: string;
@@ -25,6 +26,8 @@ interface UseLocalPlayerActions {
   reset: (spawnX: number, spawnY: number) => void;
   update: (delta: number) => SkierRenderState;
   setRunState: (state: SkierState) => void;
+  setObstacles: (obstacles: StaticObstacle[]) => void;
+  setWindZones: (zones: WindZone[]) => void;
 }
 
 export interface UseLocalPlayerReturn {
@@ -120,6 +123,14 @@ export function useLocalPlayer(): UseLocalPlayerReturn {
     runState,
   };
 
+  const setObstacles = useCallback((obstacles: StaticObstacle[]) => {
+    physics.setObstacles(obstacles);
+  }, [physics]);
+
+  const setWindZones = useCallback((zones: WindZone[]) => {
+    physics.setWindZones(zones);
+  }, [physics]);
+
   const actions: UseLocalPlayerActions = {
     initAtSpawn,
     startDrawing: drawing.startDrawing,
@@ -132,6 +143,8 @@ export function useLocalPlayer(): UseLocalPlayerReturn {
     reset,
     update,
     setRunState,
+    setObstacles,
+    setWindZones,
   };
 
   return { player, actions };
