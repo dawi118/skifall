@@ -1,0 +1,111 @@
+/* Skill Score Display - positioned in top left below player avatars */
+.skill-score-display {
+  position: fixed;
+  top: 90px;
+  left: 16px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  padding: 12px 16px;
+  min-width: 80px;
+  text-align: center;
+  z-index: 998;
+  overflow: visible;
+}
+
+.skill-score-label {
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+.skill-score-value {
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 32px;
+  font-weight: bold;
+  color: #22C55E;
+  text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+/* Container for trick labels that animate upward */
+.trick-label-container {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* Trick label that animates up and fades out */
+.trick-label {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 18px;
+  font-weight: bold;
+  color: #FBBF24;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+  white-space: nowrap;
+  animation: trick-label-rise 1s ease-out forwards;
+}
+
+@keyframes trick-label-rise {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-40px);
+  }
+}
+
+/* Position-based popup showing trick name and points */
+.trick-popup {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'VT323', 'Courier New', monospace;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 200;
+  animation: trick-popup-rise 1s ease-out forwards;
+}
+
+.trick-popup-label {
+  font-size: 20px;
+  color: #FBBF24;
+  text-shadow: 
+    0 0 8px rgba(251, 191, 36, 0.8),
+    2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+.trick-popup-points {
+  font-size: 24px;
+  color: #22C55E;
+  text-shadow: 
+    0 0 8px rgba(34, 197, 94, 0.8),
+    2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+@keyframes trick-popup-rise {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -100%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -150%) scale(0.8);
+  }
+}
+

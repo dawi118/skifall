@@ -8,6 +8,7 @@ export type GamePhase = 'lobby' | 'playing' | 'round-complete' | 'game-over';
 export interface RoundResult {
   finishTime: number | null;
   score: number;
+  skillScore: number;
 }
 
 export interface Player {
@@ -192,8 +193,8 @@ export function usePartySocket(roomId: string | null) {
     send({ type: 'set-total-rounds', totalRounds });
   }, [send]);
 
-  const sendPlayerFinished = useCallback((finishTime: number | null) => {
-    send({ type: 'player-finished', finishTime });
+  const sendPlayerFinished = useCallback((finishTime: number | null, skillScore: number = 0) => {
+    send({ type: 'player-finished', finishTime, skillScore });
   }, [send]);
 
   const playAgain = useCallback(() => {

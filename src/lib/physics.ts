@@ -42,6 +42,16 @@ export interface PhysicsEngine {
   crashed: boolean;
   spawnX: number;
   spawnY: number;
+  skisGroundContacts: number;
+}
+
+export interface SkierPhysicsState {
+  position: { x: number; y: number };
+  velocity: { x: number; y: number };
+  angle: number;
+  angularVelocity: number;
+  isGrounded: boolean;
+  crashed: boolean;
 }
 
 export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngine {
@@ -169,6 +179,7 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
     crashed: false,
     spawnX,
     spawnY,
+    skisGroundContacts: 0,
   };
 
   world.on('begin-contact', (contact) => {
@@ -176,6 +187,12 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
     const bodyB = contact.getFixtureB().getBody();
     const userDataA = bodyA.getUserData() as { type: string } | null;
     const userDataB = bodyB.getUserData() as { type: string } | null;
+
+    const skisHitGround = userDataA?.type === 'skis' && bodyB === groundBody;
+    const groundHitSkis = userDataB?.type === 'skis' && bodyA === groundBody;
+    if (skisHitGround || groundHitSkis) {
+      engine.skisGroundContacts++;
+    }
 
     const bodyHitGround = userDataA?.type === 'body' && bodyB === groundBody;
     const groundHitBody = userDataB?.type === 'body' && bodyA === groundBody;
@@ -189,6 +206,19 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
       if (speed > CRASH_VELOCITY_THRESHOLD) {
         engine.crashed = true;
       }
+    }
+  });
+
+  world.on('end-contact', (contact) => {
+    const bodyA = contact.getFixtureA().getBody();
+    const bodyB = contact.getFixtureB().getBody();
+    const userDataA = bodyA.getUserData() as { type: string } | null;
+    const userDataB = bodyB.getUserData() as { type: string } | null;
+
+    const skisLeftGround = userDataA?.type === 'skis' && bodyB === groundBody;
+    const groundLeftSkis = userDataB?.type === 'skis' && bodyA === groundBody;
+    if (skisLeftGround || groundLeftSkis) {
+      engine.skisGroundContacts = Math.max(0, engine.skisGroundContacts - 1);
     }
   });
 
@@ -285,6 +315,7 @@ export function resetSkier(engine: PhysicsEngine): void {
   engine.upperBody.setActive(false);
   engine.lowerBody.setActive(false);
   engine.skis.setActive(false);
+  engine.skisGroundContacts = 0;
 }
 
 export function startSkier(engine: PhysicsEngine): void {
@@ -330,6 +361,20 @@ export function getSkierState(engine: PhysicsEngine): SkierRenderState {
     upper: { x: toPixels(upperPos.x), y: toPixels(upperPos.y), angle: engine.upperBody.getAngle() },
     lower: { x: toPixels(lowerPos.x), y: toPixels(lowerPos.y), angle: engine.lowerBody.getAngle() },
     skis: { x: toPixels(skisPos.x), y: toPixels(skisPos.y), angle: engine.skis.getAngle() },
+    crashed: engine.crashed,
+  };
+}
+
+export function getSkierPhysicsState(engine: PhysicsEngine): SkierPhysicsState {
+  const skisPos = engine.skis.getPosition();
+  const skisVel = engine.skis.getLinearVelocity();
+
+  return {
+    position: { x: toPixels(skisPos.x), y: toPixels(skisPos.y) },
+    velocity: { x: toPixels(skisVel.x), y: toPixels(skisVel.y) },
+    angle: engine.skis.getAngle(),
+    angularVelocity: engine.skis.getAngularVelocity(),
+    isGrounded: engine.skisGroundContacts > 0,
     crashed: engine.crashed,
   };
 }

@@ -40,3 +40,11 @@
 - **Branch previews**: Both services support preview deployments - Netlify auto-deploys branches, GitHub Actions deploys PartyKit with branch-specific names
 - **Avoid double-broadcast**: When server transitions game phases (all ready → start), don't broadcast intermediate state before calling `startRound()` - it causes race conditions on clients
 
+### Skill/Trick Point System
+- **Physics state exposure**: When game features need physics data (velocity, isGrounded, angle), add a dedicated `getPhysicsState()` getter to the physics hook rather than modifying existing return values
+- **Accumulator pattern**: Time-based points (ski +1/0.2s, air +2/0.2s) use accumulators that increment with delta time and award points when threshold reached
+- **Rotation tracking**: Track cumulative rotation while airborne, check on landing whether it exceeds 360° for flip detection
+- **Event-based UI**: Trick events include position for on-screen popups plus type for score display animations; auto-remove events after animation duration
+- **Plank.js contact events**: Use `world.on('begin-contact')` and `world.on('end-contact')` to track ski-ground contact count for isGrounded state
+- **End-to-end type flow**: Adding new data (skillScore) requires updating interfaces in: client types → hook → PartySocket → server → back to RoundComplete display
+

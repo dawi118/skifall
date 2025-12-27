@@ -4,9 +4,11 @@ import { useLocalPlayer } from "../hooks/useLocalPlayer";
 import { useGameState } from "../hooks/useGameState";
 import { useCamera } from "../hooks/useCamera";
 import { useTimer } from "../hooks/useTimer";
+import { useSkillTracker } from "../hooks/useSkillTracker";
 import { Toolbar } from "./Toolbar";
 import { Timer } from "./Timer";
 import { RoundComplete } from "./RoundComplete";
+import { SkillDisplay } from "./SkillDisplay";
 import {
   COLORS,
   PLAYING_ZOOM,
@@ -85,7 +87,7 @@ interface GameCanvasProps {
   onLineAdd?: (line: Line) => void;
   onLineRemove?: (lineId: string) => void;
   onSkierPosition?: (state: SkierRenderState, runState: SkierState) => void;
-  onPlayerFinished?: (finishTime: number | null) => void;
+  onPlayerFinished?: (finishTime: number | null, skillScore: number) => void;
   onSetReady?: (isReady: boolean) => void;
   onPlayAgain?: () => void;
 }
@@ -136,6 +138,7 @@ export function GameCanvas({
   const { player, actions } = useLocalPlayer();
   const camera = useCamera(gameState.level.start);
   const timer = useTimer();
+  const skillTracker = useSkillTracker();
 
   const level = gameState.level;
   const levelKey = level.id;
@@ -156,6 +159,7 @@ export function GameCanvas({
     pendingServerLevelRef.current = serverLevel;
     actions.reset(level.start.x, level.start.y);
     timer.stop();
+    skillTracker.reset();
     setTransitionPhase("skier-out");
     skierScaleTarget.current = 0;
     onSkierPosition?.(player.skierRenderState, "idle");
@@ -166,6 +170,7 @@ export function GameCanvas({
     actions,
     level.start,
     timer,
+    skillTracker,
     onSkierPosition,
     player.skierRenderState,
   ]);
@@ -379,6 +384,14 @@ export function GameCanvas({
       ) {
         const result = actions.update(delta);
 
+        // Update skill tracker with physics state
+        if (player.runState === "moving") {
+          const physicsState = actions.getPhysicsState();
+          if (physicsState) {
+            skillTracker.update(physicsState, delta);
+          }
+        }
+
         if (player.runState === "moving" && !result.crashed) {
           const dx = result.skis.x - level.finish.x;
           const dy = result.skis.y - (level.finish.y - 20);
@@ -459,6 +472,7 @@ export function GameCanvas({
     level.finish,
     onSkierPosition,
     remoteSkiers,
+    skillTracker,
   ]);
 
   const handlePointerDown = useCallback(
@@ -633,6 +647,7 @@ export function GameCanvas({
 
     actions.reset(level.start.x, level.start.y);
     gameState.resetRound();
+    skillTracker.reset();
     onSkierPosition?.(player.skierRenderState, "idle");
 
     setSkierVisible(false);
@@ -654,6 +669,7 @@ export function GameCanvas({
     level.start,
     transitionPhase,
     gameState,
+    skillTracker,
     onSkierPosition,
     player.skierRenderState,
   ]);
@@ -689,11 +705,12 @@ export function GameCanvas({
     if (player.runState === "finished" && !hasSentFinish.current) {
       hasSentFinish.current = true;
       const finishTime = timer.timeElapsed;
-      gameState.finishRound(finishTime);
+      const finalSkillScore = skillTracker.skillScore;
+      gameState.finishRound(finishTime, finalSkillScore);
       timer.stop();
-      onPlayerFinished?.(finishTime);
+      onPlayerFinished?.(finishTime, finalSkillScore);
     }
-  }, [player.runState, timer, gameState, onPlayerFinished]);
+  }, [player.runState, timer, gameState, onPlayerFinished, skillTracker.skillScore]);
 
   useEffect(() => {
     // Only DNF if we're in gameplay (not transitioning) and timer expired during this round
@@ -702,8 +719,10 @@ export function GameCanvas({
     if (timer.isExpired && canDNF && inGameplay && !hasSentFinish.current) {
       hasSentFinish.current = true;
       actions.setRunState("fallen");
-      gameState.finishRound(null);
-      onPlayerFinished?.(null);
+      // DNF gets 0 score but still records any skill points earned
+      const finalSkillScore = skillTracker.skillScore;
+      gameState.finishRound(null, finalSkillScore);
+      onPlayerFinished?.(null, finalSkillScore);
     }
   }, [
     timer.isExpired,
@@ -713,6 +732,7 @@ export function GameCanvas({
     actions,
     gameState,
     onPlayerFinished,
+    skillTracker.skillScore,
   ]);
 
   const isSpectating = localPlayer?.isSpectating ?? false;
@@ -766,6 +786,15 @@ export function GameCanvas({
       )}
 
       {DEV_MODE && <DevMenu onNewLevel={handleNewLevel} />}
+
+      {player.runState === "moving" && (
+        <SkillDisplay
+          score={skillTracker.skillScore}
+          events={skillTracker.events}
+          camera={camera.camera}
+          canvasRect={canvasRef.current?.getBoundingClientRect() ?? null}
+        />
+      )}
 
       <div className="top-controls">
         <img

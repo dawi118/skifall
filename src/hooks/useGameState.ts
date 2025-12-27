@@ -7,6 +7,7 @@ export type RoundPhase = 'ready' | 'playing' | 'finished';
 export interface RoundResult {
   finishTime: number | null;
   score: number;
+  skillScore: number;
 }
 
 interface UseGameStateReturn {
@@ -16,7 +17,7 @@ interface UseGameStateReturn {
   generateNextLevel: () => void;
   applyPendingLevel: () => void;
   setLevel: (level: Level) => void;
-  finishRound: (finishTime: number | null) => void;
+  finishRound: (finishTime: number | null, skillScore?: number) => void;
   resetRound: () => void;
 }
 
@@ -46,10 +47,11 @@ export function useGameState(initialLevel?: Level | null): UseGameStateReturn {
     setRoundResult(null);
   }, []);
 
-  const finishRound = useCallback((finishTime: number | null) => {
+  const finishRound = useCallback((finishTime: number | null, skillScore: number = 0) => {
     setRoundResult({
       finishTime,
-      score: calculateScore(finishTime),
+      score: calculateScore(finishTime, skillScore),
+      skillScore,
     });
   }, []);
 

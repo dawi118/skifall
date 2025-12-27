@@ -1,8 +1,9 @@
 import { BASE_POINTS } from './constants';
 
-export function calculateScore(finishTimeSeconds: number | null): number {
+export function calculateScore(finishTimeSeconds: number | null, skillScore: number = 0): number {
   if (finishTimeSeconds === null) return 0;
-  return Math.max(0, BASE_POINTS - Math.floor(finishTimeSeconds));
+  const timeScore = Math.max(0, BASE_POINTS - Math.floor(finishTimeSeconds));
+  return timeScore + skillScore;
 }
 
 export function formatTime(seconds: number): string {
