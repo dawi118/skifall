@@ -1,8 +1,11 @@
-import { BASE_POINTS } from './constants';
+import { BASE_POINTS, ROUND_DURATION_SECONDS, COUNTDOWN_SECONDS } from './constants';
 
 export function calculateScore(finishTimeSeconds: number | null): number {
   if (finishTimeSeconds === null) return 0;
-  return Math.max(0, BASE_POINTS - Math.floor(finishTimeSeconds));
+  // Scale scoring: 0 seconds = BASE_POINTS, max time (180s) = 0 points
+  const maxPlayTime = ROUND_DURATION_SECONDS - COUNTDOWN_SECONDS; // 180 seconds
+  const scaledTime = finishTimeSeconds * (BASE_POINTS / maxPlayTime);
+  return Math.max(0, BASE_POINTS - Math.floor(scaledTime));
 }
 
 export function formatTime(seconds: number): string {

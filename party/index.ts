@@ -49,7 +49,10 @@ interface Line {
 
 function calculateScore(finishTime: number | null): number {
   if (finishTime === null) return 0;
-  return Math.max(0, 100 - Math.floor(finishTime));
+  // Scale scoring: 0 seconds = 100 points, max time (180s) = 0 points
+  const maxPlayTime = 180; // ROUND_DURATION_SECONDS - COUNTDOWN_SECONDS
+  const scaledTime = finishTime * (100 / maxPlayTime);
+  return Math.max(0, 100 - Math.floor(scaledTime));
 }
 
 export default class SkiFallServer implements PartyKitServer {

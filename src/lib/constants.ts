@@ -5,7 +5,7 @@ export const GHOST_LERP_SPEED = 0.25;
 export const SKIER_BROADCAST_INTERVAL = 66; // ~15Hz
 
 export const GRAVITY = 1;
-export const CRASH_VELOCITY_THRESHOLD = 8; // m/s - body impacts below this won't cause crash
+export const CRASH_VELOCITY_THRESHOLD = 16; // m/s - body impacts below this won't cause crash (doubled for resilience)
 
 export const SKIER_WIDTH = 20;
 export const SKIER_HEIGHT = 30;
@@ -24,7 +24,7 @@ export const LEVEL_BOUNDS = {
 } as const;
 
 export const COUNTDOWN_SECONDS = 3;
-export const ROUND_DURATION_SECONDS = 60 + COUNTDOWN_SECONDS; // 60 seconds + 3 second countdown
+export const ROUND_DURATION_SECONDS = 180 + COUNTDOWN_SECONDS; // 180 seconds + 3 second countdown
 export const BASE_POINTS = 100;
 export const FINISH_ZONE_RADIUS = 50;
 

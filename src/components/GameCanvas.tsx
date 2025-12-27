@@ -26,7 +26,10 @@ import {
   drawLine,
   applyCameraTransform,
   calculateFitBounds,
+  drawStaticObstacles,
+  drawWindZones,
 } from "../lib/renderer";
+import { loadObstacleSprites, type ObstacleSprites } from "../lib/obstacle-sprites";
 import { drawSkier, drawGhostSkier, setSkierCharacter } from "../lib/skier";
 import startBtnImg from "../assets/images/start.png";
 import resetBtnImg from "../assets/images/reset.png";
@@ -124,6 +127,8 @@ export function GameCanvas({
   const [portalScale, setPortalScale] = useState(0);
   const [transitionPhase, setTransitionPhase] =
     useState<TransitionPhase>("portals-in");
+  const [animationTime, setAnimationTime] = useState(0);
+  const [obstacleSprites, setObstacleSprites] = useState<ObstacleSprites | null>(null);
 
   const skierScaleTarget = useRef<number | null>(null);
   const portalScaleTarget = useRef<number | null>(1); // Start with target=1 for intro animation
@@ -141,6 +146,11 @@ export function GameCanvas({
   const levelKey = level.id;
   const pendingServerLevelRef = useRef<typeof serverLevel>(null);
   const lastSyncedLevelRef = useRef<string | null>(null);
+
+  // Load obstacle sprites on mount
+  useEffect(() => {
+    loadObstacleSprites().then(setObstacleSprites).catch(console.error);
+  }, []);
 
   // Set local player's character sprite
   useEffect(() => {
@@ -175,6 +185,8 @@ export function GameCanvas({
     lastSyncedLevelRef.current = levelKey;
 
     actions.initAtSpawn(level.start.x, level.start.y);
+    actions.setObstacles(level.staticObstacles);
+    actions.setWindZones(level.windZones);
 
     const bounds = calculateFitBounds(
       level.start,
@@ -200,6 +212,8 @@ export function GameCanvas({
     actions,
     level.start,
     level.finish,
+    level.staticObstacles,
+    level.windZones,
     canvasSize,
     camera,
     timer,
@@ -316,6 +330,11 @@ export function GameCanvas({
     applyCameraTransform(ctx, camera.camera, width, height);
 
     drawGrid(ctx, camera.camera, width, height);
+    
+    // Draw obstacles and wind zones before markers so they appear behind
+    drawStaticObstacles(ctx, level.staticObstacles, obstacleSprites);
+    drawWindZones(ctx, level.windZones, animationTime);
+    
     drawMarker(ctx, level.start, "START", COLORS.startZone, portalScale);
     drawMarker(ctx, level.finish, "FINISH", COLORS.finishZone, portalScale);
 
@@ -355,6 +374,10 @@ export function GameCanvas({
     canvasSize,
     camera.camera,
     level,
+    level.staticObstacles,
+    level.windZones,
+    animationTime,
+    obstacleSprites,
     player.lines,
     player.currentStroke,
     player.skierRenderState,
@@ -371,6 +394,9 @@ export function GameCanvas({
     const loop = (time: number) => {
       const delta = lastTimeRef.current ? time - lastTimeRef.current : 16.67;
       lastTimeRef.current = time;
+      
+      // Update animation time for wind wisps
+      setAnimationTime(prev => prev + delta);
 
       if (
         player.runState === "moving" ||
