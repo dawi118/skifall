@@ -71,7 +71,6 @@ jobs:
             const netlifyUrl = `https://deploy-preview-${prNumber}--${{ vars.NETLIFY_SITE_NAME }}.netlify.app`;
             const partyKitUrl = `https://ski-fall-pr-${prNumber}.${{ vars.PARTYKIT_USERNAME }}.partykit.dev`;
             
-            // Check if we already commented
             const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -82,14 +81,14 @@ jobs:
               c.user.type === 'Bot' && c.body.includes('Preview Deployed')
             );
             
-            const body = `🎿 **Preview Deployed!**
-
-| | URL |
-|---|---|
-| 🎮 **Play** | ${netlifyUrl} |
-| 🔧 Backend | \`${partyKitUrl}\` |
-
-_Previews will be automatically deleted when the PR is closed._`;
+            const body = [
+              '🎿 **Preview Deployed!**',
+              '',
+              `🎮 **Play:** ${netlifyUrl}`,
+              `🔧 **Backend:** \`${partyKitUrl}\``,
+              '',
+              '_Previews will be automatically deleted when the PR is closed._'
+            ].join('\n');
             
             if (botComment) {
               await github.rest.issues.updateComment({
