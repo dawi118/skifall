@@ -7,9 +7,13 @@ import {
   startSkier,
   stepPhysics,
   getSkierState,
+  addStaticObstacle,
+  addMovingObstacle,
+  clearObstacles as clearObstaclesInEngine,
+  setWindZones as setWindZonesInEngine,
   type PhysicsEngine,
 } from '../lib/physics';
-import type { Line } from '../types';
+import type { Line, StaticObstacle, MovingObstacle, WindZone } from '../types';
 import type { SkierRenderState } from '../lib/skier';
 
 interface UsePhysicsReturn {
@@ -17,6 +21,10 @@ interface UsePhysicsReturn {
   addLine: (line: Line) => void;
   removeLine: (lineId: string) => void;
   getLineIds: () => string[];
+  addStaticObstacles: (obstacles: StaticObstacle[]) => void;
+  addMovingObstacles: (obstacles: MovingObstacle[], startTime?: number) => void;
+  setWindZones: (zones: WindZone[]) => void;
+  clearObstacles: () => void;
   reset: () => void;
   play: () => void;
   update: (delta: number) => SkierRenderState;
@@ -60,6 +68,34 @@ export function usePhysics(): UsePhysicsReturn {
     }
   }, []);
 
+  const addStaticObstacles = useCallback((obstacles: StaticObstacle[]) => {
+    if (engineRef.current) {
+      for (const obstacle of obstacles) {
+        addStaticObstacle(engineRef.current, obstacle);
+      }
+    }
+  }, []);
+
+  const addMovingObstacles = useCallback((obstacles: MovingObstacle[], startTime: number = 0) => {
+    if (engineRef.current) {
+      for (const obstacle of obstacles) {
+        addMovingObstacle(engineRef.current, obstacle, startTime);
+      }
+    }
+  }, []);
+
+  const setWindZones = useCallback((zones: WindZone[]) => {
+    if (engineRef.current) {
+      setWindZonesInEngine(engineRef.current, zones);
+    }
+  }, []);
+
+  const clearObstacles = useCallback(() => {
+    if (engineRef.current) {
+      clearObstaclesInEngine(engineRef.current);
+    }
+  }, []);
+
   const update = useCallback((delta: number): SkierRenderState => {
     if (engineRef.current) {
       stepPhysics(engineRef.current, delta);
@@ -84,6 +120,10 @@ export function usePhysics(): UsePhysicsReturn {
     addLine,
     removeLine,
     getLineIds,
+    addStaticObstacles,
+    addMovingObstacles,
+    setWindZones,
+    clearObstacles,
     reset,
     play,
     update,

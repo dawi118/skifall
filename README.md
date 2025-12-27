@@ -6,8 +6,9 @@ A multiplayer ski racing game where players draw lines to guide their skier down
 
 1. **Create or Join a Game** - Share the room code with friends
 2. **Draw Lines** - Use the pencil tool to create slopes for your skier
-3. **Race!** - Click Start and guide your skier to the finish
-4. **Compete** - Best time wins each round, cumulative scores determine the winner
+3. **Navigate Obstacles** - Avoid static obstacles, time your moves around moving obstacles, and account for wind zones
+4. **Race!** - Click Start and guide your skier to the finish
+5. **Compete** - Best time wins each round, cumulative scores determine the winner
 
 ---
 
@@ -147,11 +148,16 @@ ski-fall/
 │   ├── components/         # React components (GameCanvas, Lobby, etc.)
 │   ├── hooks/              # Custom React hooks (usePhysics, usePartySocket, etc.)
 │   ├── lib/                # Pure utility functions (physics, rendering, etc.)
-│   └── types.ts            # TypeScript type definitions
+│   │   ├── physics.ts      # Physics engine with obstacle and wind support
+│   │   ├── renderer.ts     # Rendering functions for obstacles, wind zones, passages
+│   │   └── level-generator.ts  # Client-side level generation
+│   └── types.ts            # TypeScript type definitions (obstacles, wind zones, etc.)
 ├── party/                  # PartyKit server
-│   ├── index.ts            # Main server logic
-│   ├── level-generator.ts  # Random level generation
+│   ├── index.ts            # Main server logic with obstacle synchronization
+│   ├── level-generator.ts  # Server-side level generation with obstacles
 │   └── player-names.ts     # Random name generator
+├── planning/               # Design documents
+│   └── DYNAMIC_LEVEL_GENERATION.md  # Detailed feature specification
 ├── .github/workflows/      # GitHub Actions for PartyKit deployment
 ├── netlify.toml            # Netlify build configuration
 └── partykit.json           # PartyKit configuration

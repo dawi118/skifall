@@ -25,6 +25,7 @@ interface UseLocalPlayerActions {
   reset: (spawnX: number, spawnY: number) => void;
   update: (delta: number) => SkierRenderState;
   setRunState: (state: SkierState) => void;
+  physics: ReturnType<typeof usePhysics>;
 }
 
 export interface UseLocalPlayerReturn {
@@ -132,6 +133,7 @@ export function useLocalPlayer(): UseLocalPlayerReturn {
     reset,
     update,
     setRunState,
+    physics,
   };
 
   return { player, actions };

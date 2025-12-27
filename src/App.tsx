@@ -51,6 +51,7 @@ function App() {
     roundOptions,
     remoteLines,
     remoteSkiers,
+    obstaclePositions,
     setReady,
     setTotalRoundsOption,
     sendPlayerFinished,
@@ -117,6 +118,7 @@ function App() {
         gamePhase={gamePhase}
         currentRound={currentRound}
         totalRounds={totalRounds}
+        obstaclePositions={obstaclePositions}
         onRequestNewLevel={requestNewLevel}
         onLineAdd={sendLineAdd}
         onLineRemove={sendLineRemove}

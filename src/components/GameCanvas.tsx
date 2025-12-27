@@ -26,6 +26,9 @@ import {
   drawLine,
   applyCameraTransform,
   calculateFitBounds,
+  drawObstacles,
+  drawWindZones,
+  drawNarrowPassages,
 } from "../lib/renderer";
 import { drawSkier, drawGhostSkier, setSkierCharacter } from "../lib/skier";
 import type { SkierCharacter } from "../lib/sprites";
@@ -37,7 +40,7 @@ import {
 import "./GameCanvas.css";
 
 import type { Level } from "../lib/level-generator";
-import type { Line, SkierRenderState, SkierState } from "../types";
+import type { Line, SkierRenderState, SkierState, Point } from "../types";
 import type {
   RemoteLine,
   Player,
@@ -79,6 +82,7 @@ interface GameCanvasProps {
   gamePhase?: GamePhase;
   currentRound?: number;
   totalRounds?: number;
+  obstaclePositions?: Map<string, Point>;
   onRequestNewLevel?: () => void;
   onLineAdd?: (line: Line) => void;
   onLineRemove?: (lineId: string) => void;
@@ -99,6 +103,7 @@ export function GameCanvas({
   gamePhase = "playing",
   currentRound = 1,
   totalRounds = 5,
+  obstaclePositions = new Map(),
   onRequestNewLevel,
   onLineAdd,
   onLineRemove,
@@ -134,6 +139,7 @@ export function GameCanvas({
   const { player, actions } = useLocalPlayer();
   const camera = useCamera(gameState.level.start);
   const timer = useTimer();
+  const windTimeRef = useRef(0);
 
   const level = gameState.level;
   const levelKey = level.id;
@@ -173,6 +179,11 @@ export function GameCanvas({
     lastSyncedLevelRef.current = levelKey;
 
     actions.initAtSpawn(level.start.x, level.start.y);
+    
+    // Initialize obstacles and wind zones
+    actions.physics.addStaticObstacles(level.staticObstacles);
+    actions.physics.addMovingObstacles(level.movingObstacles, serverRoundStartTime || Date.now());
+    actions.physics.setWindZones(level.windZones);
 
     const bounds = calculateFitBounds(
       level.start,
@@ -198,6 +209,9 @@ export function GameCanvas({
     actions,
     level.start,
     level.finish,
+    level.staticObstacles,
+    level.movingObstacles,
+    level.windZones,
     canvasSize,
     camera,
     timer,
@@ -314,6 +328,20 @@ export function GameCanvas({
     applyCameraTransform(ctx, camera.camera, width, height);
 
     drawGrid(ctx, camera.camera, width, height);
+    
+    // Draw wind zones first (background effect)
+    drawWindZones(ctx, level.windZones, windTimeRef.current);
+    
+    // Draw narrow passages
+    drawNarrowPassages(ctx, level.narrowPassages);
+    
+    // Draw obstacles
+    const movingObstaclesWithPositions = level.movingObstacles.map(obs => ({
+      ...obs,
+      currentPosition: obstaclePositions.get(obs.id) || obs.basePosition,
+    }));
+    drawObstacles(ctx, level.staticObstacles, movingObstaclesWithPositions, windTimeRef.current);
+    
     drawMarker(ctx, level.start, "START", COLORS.startZone, portalScale);
     drawMarker(ctx, level.finish, "FINISH", COLORS.finishZone, portalScale);
 
@@ -353,6 +381,11 @@ export function GameCanvas({
     canvasSize,
     camera.camera,
     level,
+    level.staticObstacles,
+    level.movingObstacles,
+    level.windZones,
+    level.narrowPassages,
+    obstaclePositions,
     player.lines,
     player.currentStroke,
     player.skierRenderState,
@@ -439,6 +472,8 @@ export function GameCanvas({
           interpolatedSkiersRef.current.delete(playerId);
         }
       }
+
+      windTimeRef.current += delta / 1000;
 
       render();
       animationFrameRef.current = requestAnimationFrame(loop);

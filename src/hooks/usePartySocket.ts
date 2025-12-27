@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import PartySocket from 'partysocket';
 import type { Level } from '../lib/level-generator';
-import type { Line, SkierRenderState, SkierState } from '../types';
+import type { Line, SkierRenderState, SkierState, Point } from '../types';
 
 export type GamePhase = 'lobby' | 'playing' | 'round-complete' | 'game-over';
 
@@ -47,6 +47,7 @@ export function usePartySocket(roomId: string | null) {
   const [roundOptions, setRoundOptions] = useState<number[]>([3, 5, 7, 10]);
   const [remoteLines, setRemoteLines] = useState<RemoteLine[]>([]);
   const [remoteSkiers, setRemoteSkiers] = useState<Map<string, RemoteSkier>>(new Map());
+  const [obstaclePositions, setObstaclePositions] = useState<Map<string, Point>>(new Map());
   
   const socketRef = useRef<PartySocket | null>(null);
   const messageHandlerRef = useRef<((data: unknown) => void) | null>(null);
@@ -164,6 +165,18 @@ export function usePartySocket(roomId: string | null) {
             });
             break;
             
+          case 'obstacle-positions':
+            if (data.positions) {
+              setObstaclePositions(prev => {
+                const next = new Map(prev);
+                for (const { id, position } of data.positions) {
+                  next.set(id, position);
+                }
+                return next;
+              });
+            }
+            break;
+            
           default:
             messageHandlerRef.current?.(data);
         }
@@ -239,6 +252,7 @@ export function usePartySocket(roomId: string | null) {
     roundOptions,
     remoteLines,
     remoteSkiers,
+    obstaclePositions,
     setReady,
     setTotalRoundsOption,
     sendPlayerFinished,

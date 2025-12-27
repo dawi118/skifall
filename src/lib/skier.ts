@@ -1,5 +1,5 @@
 import { SKIER_WIDTH, SKIER_HEIGHT, COLORS } from './constants';
-import { getSkierSprites, type SkierCharacter, type SkierSprites } from './sprites';
+import { getSkierSprites, type SkierCharacter } from './sprites';
 import type { SkierRenderState } from '../types';
 
 export type { SkierRenderState } from '../types';

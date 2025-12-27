@@ -1,6 +1,6 @@
 import type { Party, PartyKitServer, Connection } from "partykit/server";
 import { generatePlayerName } from "./player-names";
-import { generateLevel, type Level } from "./level-generator";
+import { generateLevel, type Level, type MovingObstacle, type Point } from "./level-generator";
 
 const PLAYER_COLORS = [
   "#E11D48", // rose
@@ -65,6 +65,8 @@ export default class SkiFallServer implements PartyKitServer {
   roundStartTime: number | null = null;
   currentRound: number = 0;
   totalRounds: number = DEFAULT_TOTAL_ROUNDS;
+  movingObstaclePositions: Map<string, Point> = new Map();
+  obstacleUpdateInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(readonly room: Party) {}
 
@@ -94,11 +96,55 @@ export default class SkiFallServer implements PartyKitServer {
     return active.length > 0 && active.every(p => p.roundResult !== null);
   }
 
+  updateMovingObstacles() {
+    if (!this.level || this.gamePhase !== 'playing') return;
+
+    const currentTime = Date.now();
+    const elapsed = this.roundStartTime ? (currentTime - this.roundStartTime) / 1000 : 0;
+
+    for (const obstacle of this.level.movingObstacles) {
+      const pattern = obstacle.movement;
+      let newX = obstacle.basePosition.x;
+      let newY = obstacle.basePosition.y;
+
+      if (pattern.type === 'linear' && pattern.path && pattern.path.length >= 2) {
+        const totalDist = Math.sqrt(
+          Math.pow(pattern.path[1].x - pattern.path[0].x, 2) +
+          Math.pow(pattern.path[1].y - pattern.path[0].y, 2)
+        );
+        const cycleTime = totalDist / pattern.speed;
+        const t = (elapsed % (cycleTime * 2)) / cycleTime;
+        const progress = t <= 1 ? t : 2 - t;
+        newX = pattern.path[0].x + (pattern.path[1].x - pattern.path[0].x) * progress;
+        newY = pattern.path[0].y + (pattern.path[1].y - pattern.path[0].y) * progress;
+      } else if (pattern.type === 'oscillate' && pattern.amplitude && pattern.frequency) {
+        const offset = pattern.amplitude * Math.sin(elapsed * pattern.frequency * Math.PI * 2);
+        if (pattern.direction === 'vertical') {
+          newY = obstacle.basePosition.y + offset;
+        } else if (pattern.direction === 'horizontal') {
+          newX = obstacle.basePosition.x + offset;
+        }
+      } else if (pattern.type === 'circular' && pattern.radius) {
+        const angle = (elapsed * pattern.speed) / pattern.radius;
+        newX = obstacle.basePosition.x + Math.cos(angle) * pattern.radius;
+        newY = obstacle.basePosition.y + Math.sin(angle) * pattern.radius;
+      }
+
+      this.movingObstaclePositions.set(obstacle.id, { x: newX, y: newY });
+    }
+
+    this.room.broadcast(JSON.stringify({
+      type: 'obstacle-positions',
+      positions: Array.from(this.movingObstaclePositions.entries()).map(([id, pos]) => ({ id, position: pos })),
+    }));
+  }
+
   startRound() {
     this.currentRound++;
     this.level = generateLevel();
     this.roundStartTime = Date.now();
     this.lines.clear();
+    this.movingObstaclePositions.clear();
     
     for (const player of this.players.values()) {
       player.isReady = false;
@@ -110,9 +156,19 @@ export default class SkiFallServer implements PartyKitServer {
     
     this.gamePhase = 'playing';
     this.broadcastGameState();
+
+    if (this.obstacleUpdateInterval) {
+      clearInterval(this.obstacleUpdateInterval);
+    }
+    this.obstacleUpdateInterval = setInterval(() => this.updateMovingObstacles(), 66); // ~15Hz
+    this.updateMovingObstacles();
   }
 
   endRound() {
+    if (this.obstacleUpdateInterval) {
+      clearInterval(this.obstacleUpdateInterval);
+      this.obstacleUpdateInterval = null;
+    }
     for (const player of this.players.values()) {
       player.isReady = false;
     }
@@ -126,11 +182,16 @@ export default class SkiFallServer implements PartyKitServer {
   }
 
   resetToLobby() {
+    if (this.obstacleUpdateInterval) {
+      clearInterval(this.obstacleUpdateInterval);
+      this.obstacleUpdateInterval = null;
+    }
     this.gamePhase = 'lobby';
     this.currentRound = 0;
     this.level = null;
     this.roundStartTime = null;
     this.lines.clear();
+    this.movingObstaclePositions.clear();
     
     for (const player of this.players.values()) {
       player.isReady = false;

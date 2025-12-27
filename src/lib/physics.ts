@@ -1,5 +1,5 @@
 import * as planck from 'planck';
-import type { Line } from '../types';
+import type { Line, StaticObstacle, MovingObstacle, WindZone, Point } from '../types';
 import { smoothLineWithSpline } from './line-utils';
 import { GRAVITY, CRASH_VELOCITY_THRESHOLD } from './constants';
 import {
@@ -13,12 +13,13 @@ import {
   type SkierRenderState,
 } from './skier';
 
-const { World, Vec2, Box, Circle, Edge, RevoluteJoint, WeldJoint } = planck;
+const { World, Vec2, Box, Circle, Edge, RevoluteJoint, WeldJoint, Polygon } = planck;
 
 const SCALE = 30;
 const CATEGORY_GROUND = 0x0001;
 const CATEGORY_SKIS = 0x0002;
 const CATEGORY_BODY = 0x0004;
+const CATEGORY_OBSTACLE = 0x0008;
 
 function toPhysics(px: number): number {
   return px / SCALE;
@@ -26,6 +27,14 @@ function toPhysics(px: number): number {
 
 function toPixels(m: number): number {
   return m * SCALE;
+}
+
+export interface ObstaclePhysicsBody {
+  obstacleId: string;
+  body: planck.Body;
+  fixture: planck.Fixture;
+  isMoving: boolean;
+  movementUpdate?: (deltaTime: number) => void;
 }
 
 export interface PhysicsEngine {
@@ -39,6 +48,8 @@ export interface PhysicsEngine {
   ankleJoint: planck.Joint | null;
   groundBody: planck.Body;
   lineFixtures: Map<string, planck.Fixture[]>;
+  obstacleBodies: Map<string, ObstaclePhysicsBody>;
+  windZones: WindZone[];
   crashed: boolean;
   spawnX: number;
   spawnY: number;
@@ -80,7 +91,7 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
     friction: 0.3,
     restitution: 0.2,
     filterCategoryBits: CATEGORY_BODY,
-    filterMaskBits: CATEGORY_GROUND,
+    filterMaskBits: CATEGORY_GROUND | CATEGORY_OBSTACLE,
   });
   head.setUserData({ type: 'body' });
 
@@ -97,7 +108,7 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
     friction: 0.3,
     restitution: 0.1,
     filterCategoryBits: CATEGORY_BODY,
-    filterMaskBits: CATEGORY_GROUND,
+    filterMaskBits: CATEGORY_GROUND | CATEGORY_OBSTACLE,
   });
   upperBody.setUserData({ type: 'body' });
 
@@ -114,7 +125,7 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
     friction: 0.3,
     restitution: 0.1,
     filterCategoryBits: CATEGORY_BODY,
-    filterMaskBits: CATEGORY_GROUND,
+    filterMaskBits: CATEGORY_GROUND | CATEGORY_OBSTACLE,
   });
   lowerBody.setUserData({ type: 'body' });
 
@@ -131,7 +142,7 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
     friction: 0.02,
     restitution: 0.0,
     filterCategoryBits: CATEGORY_SKIS,
-    filterMaskBits: CATEGORY_GROUND,
+    filterMaskBits: CATEGORY_GROUND | CATEGORY_OBSTACLE,
   });
   skis.setUserData({ type: 'skis' });
 
@@ -166,6 +177,8 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
     ankleJoint,
     groundBody,
     lineFixtures: new Map(),
+    obstacleBodies: new Map(),
+    windZones: [],
     crashed: false,
     spawnX,
     spawnY,
@@ -174,14 +187,16 @@ export function createPhysicsEngine(spawnX: number, spawnY: number): PhysicsEngi
   world.on('begin-contact', (contact) => {
     const bodyA = contact.getFixtureA().getBody();
     const bodyB = contact.getFixtureB().getBody();
-    const userDataA = bodyA.getUserData() as { type: string } | null;
-    const userDataB = bodyB.getUserData() as { type: string } | null;
+    const userDataA = bodyA.getUserData() as { type: string; obstacleId?: string } | null;
+    const userDataB = bodyB.getUserData() as { type: string; obstacleId?: string } | null;
 
     const bodyHitGround = userDataA?.type === 'body' && bodyB === groundBody;
     const groundHitBody = userDataB?.type === 'body' && bodyA === groundBody;
+    const bodyHitObstacle = userDataA?.type === 'body' && userDataB?.obstacleId;
+    const obstacleHitBody = userDataB?.type === 'body' && userDataA?.obstacleId;
 
-    if ((bodyHitGround || groundHitBody) && !engine.crashed && engine.hipJoint) {
-      const bodyPart = bodyHitGround ? bodyA : bodyB;
+    if ((bodyHitGround || groundHitBody || bodyHitObstacle || obstacleHitBody) && !engine.crashed && engine.hipJoint) {
+      const bodyPart = bodyHitGround || bodyHitObstacle ? bodyA : bodyB;
       
       const velocity = bodyPart.getLinearVelocity();
       const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
@@ -315,6 +330,9 @@ export function stepPhysics(engine: PhysicsEngine, deltaMs: number): void {
     engine.skis.setAngularVelocity(engine.skis.getAngularVelocity() + (Math.random() - 0.5) * 20);
   }
 
+  updateMovingObstacles(engine, deltaMs);
+  applyWindForces(engine);
+
   const dt = Math.min(deltaMs / 1000, 1 / 30);
   engine.world.step(dt, 8, 3);
 }
@@ -332,4 +350,156 @@ export function getSkierState(engine: PhysicsEngine): SkierRenderState {
     skis: { x: toPixels(skisPos.x), y: toPixels(skisPos.y), angle: engine.skis.getAngle() },
     crashed: engine.crashed,
   };
+}
+
+function isPointInWindZone(point: Point, zone: WindZone): boolean {
+  const left = zone.position.x - zone.bounds.width / 2;
+  const right = zone.position.x + zone.bounds.width / 2;
+  const top = zone.position.y - zone.bounds.height / 2;
+  const bottom = zone.position.y + zone.bounds.height / 2;
+  return point.x >= left && point.x <= right && point.y >= top && point.y <= bottom;
+}
+
+export function addStaticObstacle(engine: PhysicsEngine, obstacle: StaticObstacle): void {
+  const pX = toPhysics(obstacle.position.x);
+  const pY = toPhysics(obstacle.position.y);
+  const pW = toPhysics(obstacle.bounds.width);
+  const pH = toPhysics(obstacle.bounds.height);
+
+  const body = engine.world.createBody({
+    type: 'static',
+    position: Vec2(pX, pY),
+  });
+
+  let shape: planck.Shape;
+  if (obstacle.shape === 'circle') {
+    shape = new Circle(Math.max(pW, pH) / 2);
+  } else if (obstacle.shape === 'polygon' && obstacle.vertices) {
+    const vertices = obstacle.vertices.map(v => Vec2(toPhysics(v.x - obstacle.position.x), toPhysics(v.y - obstacle.position.y)));
+    shape = new Polygon(vertices);
+  } else {
+    shape = new Box(pW / 2, pH / 2);
+  }
+
+  const fixture = body.createFixture({
+    shape,
+    filterCategoryBits: CATEGORY_OBSTACLE,
+    filterMaskBits: CATEGORY_BODY | CATEGORY_SKIS,
+  });
+
+  body.setUserData({ obstacleId: obstacle.id });
+
+  engine.obstacleBodies.set(obstacle.id, {
+    obstacleId: obstacle.id,
+    body,
+    fixture,
+    isMoving: false,
+  });
+}
+
+export function addMovingObstacle(engine: PhysicsEngine, obstacle: MovingObstacle, startTime: number = 0): void {
+  const pX = toPhysics(obstacle.basePosition.x);
+  const pY = toPhysics(obstacle.basePosition.y);
+  const pW = toPhysics(obstacle.bounds.width);
+  const pH = toPhysics(obstacle.bounds.height);
+
+  const body = engine.world.createBody({
+    type: 'kinematic',
+    position: Vec2(pX, pY),
+  });
+
+  const fixture = body.createFixture({
+    shape: new Box(pW / 2, pH / 2),
+    filterCategoryBits: CATEGORY_OBSTACLE,
+    filterMaskBits: CATEGORY_BODY | CATEGORY_SKIS,
+  });
+
+  body.setUserData({ obstacleId: obstacle.id });
+
+  let time = startTime / 1000;
+
+  const movementUpdate = (deltaTime: number) => {
+    time += deltaTime;
+    const pattern = obstacle.movement;
+    let newX = obstacle.basePosition.x;
+    let newY = obstacle.basePosition.y;
+
+    if (pattern.type === 'linear' && pattern.path && pattern.path.length >= 2) {
+      const totalDist = Math.sqrt(
+        Math.pow(pattern.path[1].x - pattern.path[0].x, 2) +
+        Math.pow(pattern.path[1].y - pattern.path[0].y, 2)
+      );
+      const cycleTime = totalDist / pattern.speed;
+      const t = (time % (cycleTime * 2)) / cycleTime;
+      const progress = t <= 1 ? t : 2 - t;
+      newX = pattern.path[0].x + (pattern.path[1].x - pattern.path[0].x) * progress;
+      newY = pattern.path[0].y + (pattern.path[1].y - pattern.path[0].y) * progress;
+    } else if (pattern.type === 'oscillate' && pattern.amplitude && pattern.frequency) {
+      const offset = pattern.amplitude * Math.sin(time * pattern.frequency * Math.PI * 2);
+      if (pattern.direction === 'vertical') {
+        newY = obstacle.basePosition.y + offset;
+      } else if (pattern.direction === 'horizontal') {
+        newX = obstacle.basePosition.x + offset;
+      }
+    } else if (pattern.type === 'circular' && pattern.radius) {
+      const angle = (time * pattern.speed) / pattern.radius;
+      newX = obstacle.basePosition.x + Math.cos(angle) * pattern.radius;
+      newY = obstacle.basePosition.y + Math.sin(angle) * pattern.radius;
+    }
+
+    body.setPosition(Vec2(toPhysics(newX), toPhysics(newY)));
+  };
+
+  engine.obstacleBodies.set(obstacle.id, {
+    obstacleId: obstacle.id,
+    body,
+    fixture,
+    isMoving: true,
+    movementUpdate,
+  });
+}
+
+export function removeObstacle(engine: PhysicsEngine, obstacleId: string): void {
+  const obstacleBody = engine.obstacleBodies.get(obstacleId);
+  if (obstacleBody) {
+    engine.world.destroyBody(obstacleBody.body);
+    engine.obstacleBodies.delete(obstacleId);
+  }
+}
+
+export function clearObstacles(engine: PhysicsEngine): void {
+  for (const [, obstacleBody] of engine.obstacleBodies) {
+    engine.world.destroyBody(obstacleBody.body);
+  }
+  engine.obstacleBodies.clear();
+}
+
+export function setWindZones(engine: PhysicsEngine, windZones: WindZone[]): void {
+  engine.windZones = windZones;
+}
+
+export function applyWindForces(engine: PhysicsEngine): void {
+  const skisPos = engine.skis.getPosition();
+  const skierPoint = { x: toPixels(skisPos.x), y: toPixels(skisPos.y) };
+
+  for (const zone of engine.windZones) {
+    if (isPointInWindZone(skierPoint, zone)) {
+      const windMultiplier = Math.min(zone.strength, 1.0) * 0.6; // Cap at 1.0 and scale down
+      const forceX = zone.direction === 'left' ? -windMultiplier * GRAVITY : windMultiplier * GRAVITY;
+      const force = Vec2(forceX, 0);
+      engine.skis.applyForce(force, skisPos);
+      engine.upperBody.applyForce(force, engine.upperBody.getPosition());
+      engine.lowerBody.applyForce(force, engine.lowerBody.getPosition());
+      engine.head.applyForce(force, engine.head.getPosition());
+    }
+  }
+}
+
+export function updateMovingObstacles(engine: PhysicsEngine, deltaMs: number): void {
+  const deltaTime = deltaMs / 1000;
+  for (const [, obstacleBody] of engine.obstacleBodies) {
+    if (obstacleBody.isMoving && obstacleBody.movementUpdate) {
+      obstacleBody.movementUpdate(deltaTime);
+    }
+  }
 }
