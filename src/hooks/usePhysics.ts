@@ -7,7 +7,9 @@ import {
   startSkier,
   stepPhysics,
   getSkierState,
+  getSkierPhysicsState,
   type PhysicsEngine,
+  type SkierPhysicsState,
 } from '../lib/physics';
 import type { Line } from '../types';
 import type { SkierRenderState } from '../lib/skier';
@@ -20,6 +22,7 @@ interface UsePhysicsReturn {
   reset: () => void;
   play: () => void;
   update: (delta: number) => SkierRenderState;
+  getPhysicsState: () => SkierPhysicsState | null;
 }
 
 export function usePhysics(): UsePhysicsReturn {
@@ -74,6 +77,13 @@ export function usePhysics(): UsePhysicsReturn {
     };
   }, []);
 
+  const getPhysicsState = useCallback((): SkierPhysicsState | null => {
+    if (engineRef.current) {
+      return getSkierPhysicsState(engineRef.current);
+    }
+    return null;
+  }, []);
+
   // Note: We intentionally don't clean up engineRef on unmount because
   // React StrictMode double-mounts components, which would destroy the engine
   // between the init effect and when play is called. The physics engine is
@@ -87,5 +97,6 @@ export function usePhysics(): UsePhysicsReturn {
     reset,
     play,
     update,
+    getPhysicsState,
   };
 }

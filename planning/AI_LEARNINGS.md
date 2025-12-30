@@ -24,6 +24,11 @@ Concise directives for working on this codebase, ordered by frequency of relevan
 ## Animation (1x)
 - **Target refs + lerp in game loop** - pattern for smooth animations without React re-renders
 
+## Game Mechanics (1x)
+- **Physics state exposure pattern** - when game features need physics data (velocity, grounded state), expose via dedicated getter functions (`getPhysicsState`) rather than modifying existing returns
+- **Skill/scoring systems as hooks** - encapsulate trick detection logic in dedicated hooks (`useSkillTracker`) that receive physics state and emit events; keeps concerns separate from core gameplay
+- **Types flow end-to-end** - when adding new data (skill score), update interfaces in all layers: client types → hook → server → back to client display
+
 ## Deployment (2x)
 - **Avoid double-broadcast on state transitions** - when server transitions game phase (e.g., all ready → start round), don't broadcast intermediate state; go straight to final state to avoid race conditions on client
 - **PartyKit servers persist state** - server instance lives beyond player connections. Reset to initial state in `onConnect` when first player joins an empty room

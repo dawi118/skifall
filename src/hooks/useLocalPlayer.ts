@@ -3,6 +3,7 @@ import { usePhysics } from './usePhysics';
 import { useDrawing } from './useDrawing';
 import type { Point, Line, SkierState } from '../types';
 import { calculateInitialPositions, type SkierRenderState } from '../lib/skier';
+import type { SkierPhysicsState } from '../lib/physics';
 
 export interface LocalPlayer {
   id: string;
@@ -25,6 +26,7 @@ interface UseLocalPlayerActions {
   reset: (spawnX: number, spawnY: number) => void;
   update: (delta: number) => SkierRenderState;
   setRunState: (state: SkierState) => void;
+  getPhysicsState: () => SkierPhysicsState | null;
 }
 
 export interface UseLocalPlayerReturn {
@@ -132,6 +134,7 @@ export function useLocalPlayer(): UseLocalPlayerReturn {
     reset,
     update,
     setRunState,
+    getPhysicsState: physics.getPhysicsState,
   };
 
   return { player, actions };
