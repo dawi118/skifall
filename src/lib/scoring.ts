@@ -1,4 +1,4 @@
-import { BASE_POINTS, ROUND_DURATION_SECONDS, COUNTDOWN_SECONDS } from './constants';
+import { BASE_POINTS } from './constants';
 
 export function calculateScore(finishTimeSeconds: number | null, skillScore: number = 0): number {
   if (finishTimeSeconds === null) return 0;
