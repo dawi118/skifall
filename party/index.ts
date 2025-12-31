@@ -22,6 +22,7 @@ type GamePhase = 'lobby' | 'playing' | 'round-complete' | 'game-over';
 interface RoundResult {
   finishTime: number | null; // null = DNF
   score: number;
+  skillScore: number;
 }
 
 interface PlayerState {
@@ -47,12 +48,10 @@ interface Line {
   playerId: string;
 }
 
-function calculateScore(finishTime: number | null): number {
+function calculateScore(finishTime: number | null, skillScore: number = 0): number {
   if (finishTime === null) return 0;
-  // Scale scoring: 0 seconds = 100 points, max time (180s) = 0 points
-  const maxPlayTime = 180; // ROUND_DURATION_SECONDS - COUNTDOWN_SECONDS
-  const scaledTime = finishTime * (100 / maxPlayTime);
-  return Math.max(0, 100 - Math.floor(scaledTime));
+  const timeScore = Math.max(0, 100 - Math.floor(finishTime));
+  return timeScore + skillScore;
 }
 
 export default class SkiFallServer implements PartyKitServer {
@@ -260,8 +259,9 @@ export default class SkiFallServer implements PartyKitServer {
       if (data.type === 'player-finished') {
         if (this.gamePhase === 'playing' && !player.isSpectating && !player.roundResult) {
           const finishTime = data.finishTime; // null for DNF
-          const score = calculateScore(finishTime);
-          player.roundResult = { finishTime, score };
+          const skillScore = data.skillScore || 0;
+          const score = calculateScore(finishTime, skillScore);
+          player.roundResult = { finishTime, score, skillScore };
           player.totalScore += score;
           
           this.room.broadcast(JSON.stringify({
