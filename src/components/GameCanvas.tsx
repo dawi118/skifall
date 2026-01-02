@@ -4,9 +4,11 @@ import { useLocalPlayer } from "../hooks/useLocalPlayer";
 import { useGameState } from "../hooks/useGameState";
 import { useCamera } from "../hooks/useCamera";
 import { useTimer } from "../hooks/useTimer";
+import { useSkillTracker } from "../hooks/useSkillTracker";
 import { Toolbar } from "./Toolbar";
 import { Timer } from "./Timer";
 import { RoundComplete } from "./RoundComplete";
+import { SkillDisplay } from "./SkillDisplay";
 import {
   COLORS,
   PLAYING_ZOOM,
@@ -26,7 +28,10 @@ import {
   drawLine,
   applyCameraTransform,
   calculateFitBounds,
+  drawStaticObstacles,
+  drawWindZones,
 } from "../lib/renderer";
+import { loadObstacleSprites, type ObstacleSprites } from "../lib/obstacle-sprites";
 import { drawSkier, drawGhostSkier, setSkierCharacter } from "../lib/skier";
 import startBtnImg from "../assets/images/start.png";
 import resetBtnImg from "../assets/images/reset.png";
@@ -85,7 +90,7 @@ interface GameCanvasProps {
   onLineAdd?: (line: Line) => void;
   onLineRemove?: (lineId: string) => void;
   onSkierPosition?: (state: SkierRenderState, runState: SkierState) => void;
-  onPlayerFinished?: (finishTime: number | null) => void;
+  onPlayerFinished?: (finishTime: number | null, skillScore: number) => void;
   onSetReady?: (isReady: boolean) => void;
   onPlayAgain?: () => void;
 }
@@ -124,6 +129,8 @@ export function GameCanvas({
   const [portalScale, setPortalScale] = useState(0);
   const [transitionPhase, setTransitionPhase] =
     useState<TransitionPhase>("portals-in");
+  const [animationTime, setAnimationTime] = useState(0);
+  const [obstacleSprites, setObstacleSprites] = useState<ObstacleSprites | null>(null);
 
   const skierScaleTarget = useRef<number | null>(null);
   const portalScaleTarget = useRef<number | null>(1); // Start with target=1 for intro animation
@@ -136,11 +143,17 @@ export function GameCanvas({
   const { player, actions } = useLocalPlayer();
   const camera = useCamera(gameState.level.start);
   const timer = useTimer();
+  const skillTracker = useSkillTracker();
 
   const level = gameState.level;
   const levelKey = level.id;
   const pendingServerLevelRef = useRef<typeof serverLevel>(null);
   const lastSyncedLevelRef = useRef<string | null>(null);
+
+  // Load obstacle sprites on mount
+  useEffect(() => {
+    loadObstacleSprites().then(setObstacleSprites).catch(console.error);
+  }, []);
 
   // Set local player's character sprite
   useEffect(() => {
@@ -156,6 +169,7 @@ export function GameCanvas({
     pendingServerLevelRef.current = serverLevel;
     actions.reset(level.start.x, level.start.y);
     timer.stop();
+    skillTracker.reset();
     setTransitionPhase("skier-out");
     skierScaleTarget.current = 0;
     onSkierPosition?.(player.skierRenderState, "idle");
@@ -166,6 +180,7 @@ export function GameCanvas({
     actions,
     level.start,
     timer,
+    skillTracker,
     onSkierPosition,
     player.skierRenderState,
   ]);
@@ -175,6 +190,8 @@ export function GameCanvas({
     lastSyncedLevelRef.current = levelKey;
 
     actions.initAtSpawn(level.start.x, level.start.y);
+    actions.setObstacles(level.staticObstacles);
+    actions.setWindZones(level.windZones);
 
     const bounds = calculateFitBounds(
       level.start,
@@ -200,6 +217,8 @@ export function GameCanvas({
     actions,
     level.start,
     level.finish,
+    level.staticObstacles,
+    level.windZones,
     canvasSize,
     camera,
     timer,
@@ -316,6 +335,11 @@ export function GameCanvas({
     applyCameraTransform(ctx, camera.camera, width, height);
 
     drawGrid(ctx, camera.camera, width, height);
+    
+    // Draw obstacles and wind zones before markers so they appear behind
+    drawStaticObstacles(ctx, level.staticObstacles, obstacleSprites);
+    drawWindZones(ctx, level.windZones, animationTime);
+    
     drawMarker(ctx, level.start, "START", COLORS.startZone, portalScale);
     drawMarker(ctx, level.finish, "FINISH", COLORS.finishZone, portalScale);
 
@@ -355,6 +379,10 @@ export function GameCanvas({
     canvasSize,
     camera.camera,
     level,
+    level.staticObstacles,
+    level.windZones,
+    animationTime,
+    obstacleSprites,
     player.lines,
     player.currentStroke,
     player.skierRenderState,
@@ -371,6 +399,9 @@ export function GameCanvas({
     const loop = (time: number) => {
       const delta = lastTimeRef.current ? time - lastTimeRef.current : 16.67;
       lastTimeRef.current = time;
+      
+      // Update animation time for wind wisps
+      setAnimationTime(prev => prev + delta);
 
       if (
         player.runState === "moving" ||
@@ -378,6 +409,14 @@ export function GameCanvas({
         player.runState === "finished"
       ) {
         const result = actions.update(delta);
+
+        // Update skill tracker with physics state
+        if (player.runState === "moving") {
+          const physicsState = actions.getPhysicsState();
+          if (physicsState) {
+            skillTracker.update(physicsState, delta);
+          }
+        }
 
         if (player.runState === "moving" && !result.crashed) {
           const dx = result.skis.x - level.finish.x;
@@ -459,6 +498,7 @@ export function GameCanvas({
     level.finish,
     onSkierPosition,
     remoteSkiers,
+    skillTracker,
   ]);
 
   const handlePointerDown = useCallback(
@@ -633,6 +673,7 @@ export function GameCanvas({
 
     actions.reset(level.start.x, level.start.y);
     gameState.resetRound();
+    skillTracker.reset();
     onSkierPosition?.(player.skierRenderState, "idle");
 
     setSkierVisible(false);
@@ -654,6 +695,7 @@ export function GameCanvas({
     level.start,
     transitionPhase,
     gameState,
+    skillTracker,
     onSkierPosition,
     player.skierRenderState,
   ]);
@@ -689,11 +731,12 @@ export function GameCanvas({
     if (player.runState === "finished" && !hasSentFinish.current) {
       hasSentFinish.current = true;
       const finishTime = timer.timeElapsed;
-      gameState.finishRound(finishTime);
+      const finalSkillScore = skillTracker.skillScore;
+      gameState.finishRound(finishTime, finalSkillScore);
       timer.stop();
-      onPlayerFinished?.(finishTime);
+      onPlayerFinished?.(finishTime, finalSkillScore);
     }
-  }, [player.runState, timer, gameState, onPlayerFinished]);
+  }, [player.runState, timer, gameState, onPlayerFinished, skillTracker.skillScore]);
 
   useEffect(() => {
     // Only DNF if we're in gameplay (not transitioning) and timer expired during this round
@@ -702,8 +745,10 @@ export function GameCanvas({
     if (timer.isExpired && canDNF && inGameplay && !hasSentFinish.current) {
       hasSentFinish.current = true;
       actions.setRunState("fallen");
-      gameState.finishRound(null);
-      onPlayerFinished?.(null);
+      // DNF gets 0 score but still records any skill points earned
+      const finalSkillScore = skillTracker.skillScore;
+      gameState.finishRound(null, finalSkillScore);
+      onPlayerFinished?.(null, finalSkillScore);
     }
   }, [
     timer.isExpired,
@@ -713,6 +758,7 @@ export function GameCanvas({
     actions,
     gameState,
     onPlayerFinished,
+    skillTracker.skillScore,
   ]);
 
   const isSpectating = localPlayer?.isSpectating ?? false;
@@ -766,6 +812,15 @@ export function GameCanvas({
       )}
 
       {DEV_MODE && <DevMenu onNewLevel={handleNewLevel} />}
+
+      {player.runState === "moving" && (
+        <SkillDisplay
+          score={skillTracker.skillScore}
+          events={skillTracker.events}
+          camera={camera.camera}
+          canvasRect={canvasRef.current?.getBoundingClientRect() ?? null}
+        />
+      )}
 
       <div className="top-controls">
         <img

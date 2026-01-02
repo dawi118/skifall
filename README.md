@@ -81,6 +81,7 @@ Add these **Variables** (click the "Variables" tab, then "New repository variabl
 | Name | Value |
 |------|-------|
 | `PARTYKIT_USERNAME` | Your PartyKit username (same as PARTYKIT_LOGIN) |
+| `NETLIFY_SITE_NAME` | Your Netlify site name (e.g., `ski-fall` for `ski-fall.netlify.app`) |
 
 ### Step 3: Set Up Netlify
 
@@ -123,19 +124,21 @@ Both Netlify and PartyKit will automatically build and deploy. Check:
 | Netlify | Builds & deploys production frontend | Your Netlify URL |
 | PartyKit | Deploys production server | `ski-fall.{username}.partykit.dev` |
 
-### Push to any other branch (e.g., `feature-xyz`)
+### Open a Pull Request
 | Service | What Happens | URL |
 |---------|--------------|-----|
-| Netlify | Creates a preview deploy | `deploy-preview-{n}--yoursite.netlify.app` |
-| PartyKit | Deploys preview server | `ski-fall-feature-xyz.{username}.partykit.dev` |
+| Netlify | Creates a preview deploy | `deploy-preview-{PR#}--yoursite.netlify.app` |
+| PartyKit | Deploys preview server | `ski-fall-pr-{PR#}.{username}.partykit.dev` |
 
 The preview frontend automatically connects to the matching preview PartyKit server!
 
-### Delete a branch
+### Close/Merge a Pull Request
 | Service | What Happens |
 |---------|--------------|
 | Netlify | Automatically removes preview |
 | PartyKit | GitHub Action deletes the preview server |
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development workflow.
 
 ---
 
@@ -188,6 +191,7 @@ No environment variables needed! The app defaults to `localhost:1999` for PartyK
 | `PARTYKIT_LOGIN` | Secret | Your PartyKit username |
 | `PARTYKIT_TOKEN` | Secret | JWT auth token for PartyKit deploys |
 | `PARTYKIT_USERNAME` | Variable | Your PartyKit username (for output URLs) |
+| `NETLIFY_SITE_NAME` | Variable | Your Netlify site name (for PR comments) |
 
 ---
 
@@ -206,6 +210,11 @@ No environment variables needed! The app defaults to `localhost:1999` for PartyK
 - Preview deploys can take 1-2 minutes
 - Check both Netlify and GitHub Actions for build status
 - Hard refresh (Cmd+Shift+R or Ctrl+Shift+R) to clear cache
+
+### Preview not connecting to backend
+- Make sure PartyKit preview deployed successfully (check PR comments)
+- The Netlify preview uses `REVIEW_ID` which is the PR number
+- Verify both use the same PR number (e.g., `ski-fall-pr-42`)
 
 ---
 

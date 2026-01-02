@@ -51,6 +51,7 @@ export function RoundComplete({
             <span className="lb-rank">Rank</span>
             <span className="lb-player">Player</span>
             <span className="lb-round">Round</span>
+            <span className="lb-skill">Skill</span>
             <span className="lb-total">Total</span>
           </div>
           {sortedPlayers.map((player, index) => {
@@ -62,6 +63,7 @@ export function RoundComplete({
                   : 'DNF')
               : '—';
             const roundScore = roundResult?.score ?? 0;
+            const skillScore = roundResult?.skillScore ?? 0;
             
             return (
               <div 
@@ -79,6 +81,9 @@ export function RoundComplete({
                 <span className="lb-round">
                   <span className="round-time">{roundDisplay}</span>
                   <span className="round-score">+{roundScore}</span>
+                </span>
+                <span className="lb-skill">
+                  {skillScore > 0 ? `+${skillScore}` : '—'}
                 </span>
                 <span className="lb-total">{player.totalScore}</span>
           </div>

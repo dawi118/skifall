@@ -7,19 +7,27 @@ import {
   startSkier,
   stepPhysics,
   getSkierState,
+  addObstaclesToWorld,
+  setWindZones,
+  getSkierPhysicsState,
   type PhysicsEngine,
+  type SkierPhysicsState,
 } from '../lib/physics';
 import type { Line } from '../types';
 import type { SkierRenderState } from '../lib/skier';
+import type { StaticObstacle, WindZone } from '../lib/level-generator';
 
 interface UsePhysicsReturn {
   initPhysics: (spawnX: number, spawnY: number) => void;
   addLine: (line: Line) => void;
   removeLine: (lineId: string) => void;
   getLineIds: () => string[];
+  setObstacles: (obstacles: StaticObstacle[]) => void;
+  setWindZones: (zones: WindZone[]) => void;
   reset: () => void;
   play: () => void;
   update: (delta: number) => SkierRenderState;
+  getPhysicsState: () => SkierPhysicsState | null;
 }
 
 export function usePhysics(): UsePhysicsReturn {
@@ -54,6 +62,18 @@ export function usePhysics(): UsePhysicsReturn {
     }
   }, []);
 
+  const setObstacles = useCallback((obstacles: StaticObstacle[]) => {
+    if (engineRef.current) {
+      addObstaclesToWorld(engineRef.current, obstacles);
+    }
+  }, []);
+
+  const setWindZonesCallback = useCallback((zones: WindZone[]) => {
+    if (engineRef.current) {
+      setWindZones(engineRef.current, zones);
+    }
+  }, []);
+
   const play = useCallback(() => {
     if (engineRef.current) {
       startSkier(engineRef.current);
@@ -74,6 +94,13 @@ export function usePhysics(): UsePhysicsReturn {
     };
   }, []);
 
+  const getPhysicsState = useCallback((): SkierPhysicsState | null => {
+    if (engineRef.current) {
+      return getSkierPhysicsState(engineRef.current);
+    }
+    return null;
+  }, []);
+
   // Note: We intentionally don't clean up engineRef on unmount because
   // React StrictMode double-mounts components, which would destroy the engine
   // between the init effect and when play is called. The physics engine is
@@ -84,8 +111,11 @@ export function usePhysics(): UsePhysicsReturn {
     addLine,
     removeLine,
     getLineIds,
+    setObstacles,
+    setWindZones: setWindZonesCallback,
     reset,
     play,
     update,
+    getPhysicsState,
   };
 }
